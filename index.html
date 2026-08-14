@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipCaptioner - AI Video Captioning</title>
+    <meta name="description" content="Simple, smooth and precise video captioning and clipping tool.">
+    <meta name="page:icon" content="🎬">
+    <meta name="page:color" content="#09090b">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- ONNX Runtime -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.25.1/dist/ort.webgpu.min.js" crossorigin="anonymous"></script>
+
+    <!-- JSZip & FileSaver -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        /* Custom Scrollbar for a sleek dark theme look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b; 
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #d4d4d8;
+            cursor: pointer;
+            margin-top: -5px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #3f3f46;
+            border-radius: 2px;
+        }
+
+        /* Prevent selection during drag */
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Outline override */
+        textarea:focus, input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(212, 212, 216, 0.45);
+        }
+
+        /* Timeline specific */
+        .handle-hitbox {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 16px;
+            cursor: ew-resize;
+            z-index: 20;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 h-screen w-screen overflow-hidden flex flex-col font-sans">
+
+    <!-- Top Navigation -->
+    <header class="h-14 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between px-6 shrink-0">
+        <div class="flex items-center space-x-3">
+            <svg class="w-6 h-6 text-zinc-200" fill="currentColor" viewBox="0 0 256 256"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM200,56V72H176V56Zm-48,0V72H104V56ZM88,56V72H64V56ZM64,200V184H88v16Zm40,0V184h48v16Zm64,0V184h32v16Zm48-32H40V88H216Z"></path></svg>
+            <h1 class="text-lg font-semibold tracking-wide">ClipCaptioner</h1>
+            
+        </div>
+        <div class="flex items-center space-x-4">
+            <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                <span>Add Videos</span>
+                <input type="file" id="upload-input" accept="video/mp4,video/webm,video/quicktime" multiple class="hidden">
+            </label>
+            <button id="ai-settings-btn" class="bg-zinc-800 hover:bg-zinc-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
+                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 16v-2m6-6h2M4 12h2m10.243-4.243 1.414-1.414M6.343 17.657l1.414-1.414m8.486 1.414 1.414 1.414M6.343 6.343l1.414 1.414"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <span>AI Settings</span>
+            </button>
+            <button id="export-btn" class="bg-zinc-100 hover:bg-white text-zinc-950 text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <span>Export ZIP</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: Files & Clips List -->
+        <aside class="w-72 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
+            <!-- Files Section -->
+            <div class="h-1/2 flex flex-col border-b border-zinc-800">
+                <div class="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider flex justify-between items-center bg-zinc-900">
+                    Source Files
+                    <span id="file-count" class="bg-zinc-700 text-zinc-200 px-2 py-0.5 rounded-full text-[10px]">0</span>
+                </div>
+                <div id="file-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                    <div class="text-zinc-500 text-sm text-center mt-10">No videos uploaded.</div>
+                </div>
+            </div>
+
+            <!-- Clips Section -->
+            <div class="h-1/2 flex flex-col">
+                <div class="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider flex justify-between items-center bg-zinc-900">
+                    Created Clips
+                    <span id="clip-count" class="bg-zinc-700 text-zinc-200 px-2 py-0.5 rounded-full text-[10px]">0</span>
+                </div>
+                <div id="clip-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                    <div class="text-zinc-500 text-sm text-center mt-10">No clips created yet.</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Area: Player, Caption Input & Timeline -->
+        <section class="flex-1 flex flex-col min-w-0 bg-zinc-950 relative">
+            
+            <!-- Video & Caption Area -->
+            <div class="flex-1 flex p-4 min-h-0 space-x-4">
+                
+                <!-- Main Video Preview -->
+                <div class="flex-[3] relative bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center overflow-hidden shadow-inner">
+                    <!-- Placeholder when no video -->
+                    <div id="video-placeholder" class="text-zinc-500 flex flex-col items-center pointer-events-none">
+                        <svg class="w-16 h-16 mb-2 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <p>Select a video to preview</p>
+                    </div>
+                    <!-- The Video Element -->
+                    <video id="main-video" class="absolute w-full h-full object-contain hidden" playsinline></video>
+                    
+                    <!-- Internal Play/Pause overlay button -->
+                    <button id="overlay-play-btn" class="absolute inset-0 w-full h-full flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity hidden">
+                        <div class="bg-zinc-100/80 p-4 rounded-full text-zinc-950 backdrop-blur-sm shadow-lg">
+                            <svg class="w-10 h-10 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Captioning & Clip Creation Panel -->
+                <div class="flex-[1] min-w-[250px] max-w-[350px] bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex flex-col shadow-inner">
+                    <h2 class="text-sm font-semibold text-zinc-300 mb-4 flex items-center">
+                        <svg class="w-4 h-4 mr-2 text-zinc-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+                        Captioning
+                    </h2>
+                    
+                    <div class="flex-1 flex flex-col space-y-3">
+                        <div class="relative flex-1 flex flex-col">
+                            <textarea id="caption-input" class="flex-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200 resize-none shadow-inner" placeholder="Enter caption for the selected range, or use AI auto-captioning..."></textarea>
+                            
+                            <!-- Auto Caption Button -->
+                            <button id="ai-caption-btn" class="absolute bottom-3 right-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs py-1.5 px-3 rounded shadow transition-colors flex items-center disabled:opacity-50">
+                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                <span>Auto Caption</span>
+                            </button>
+                        </div>
+
+                        <!-- Current Range Info -->
+                        <div class="bg-zinc-950 rounded-lg p-3 border border-zinc-800 text-xs text-zinc-400 space-y-1">
+                            <div class="flex justify-between">
+                                <span>In:</span>
+                                <span id="info-in" class="text-zinc-200 font-mono">00:00.00</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Out:</span>
+                                <span id="info-out" class="text-zinc-200 font-mono">00:00.00</span>
+                            </div>
+                            <div class="flex justify-between pt-1 border-t border-zinc-800 mt-1">
+                                <span>Duration:</span>
+                                <span id="info-dur" class="text-zinc-300 font-mono">00:00.00</span>
+                            </div>
+                        </div>
+
+                        <!-- Create Clip Button -->
+                        <button id="create-clip-btn" class="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-medium py-2.5 rounded-lg transition-colors flex justify-center items-center space-x-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                            <span>Save Clip</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline Area -->
+            <div class="h-56 bg-zinc-900 border-t border-zinc-800 flex flex-col shrink-0 select-none">
+                
+                <!-- Timeline Toolbar -->
+                <div class="h-10 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <button id="tl-play-btn" class="text-zinc-300 hover:text-zinc-950 p-1 rounded hover:bg-zinc-700 transition">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <span id="tl-time-display" class="font-mono text-sm text-zinc-300 font-medium tracking-wider">00:00.00</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3 w-48">
+                        <svg class="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
+                        <input type="range" id="zoom-slider" min="10" max="300" value="50" class="flex-1">
+                    </div>
+                </div>
+
+                <!-- Timeline Tracks Container -->
+                <div id="timeline-scroll-wrapper" class="flex-1 relative overflow-x-auto overflow-y-hidden bg-zinc-950">
+                    
+                    <div id="timeline-track" class="relative h-full min-w-full" style="width: 100%;">
+                        
+                        <!-- Ruler -->
+                        <canvas id="ruler-canvas" class="absolute top-0 left-0 w-full h-[24px] pointer-events-none"></canvas>
+
+                        <!-- Thumbnails Row -->
+                        <div id="thumbnails-container" class="absolute top-[24px] left-0 w-full h-[60px] flex pointer-events-none overflow-hidden opacity-50"></div>
+
+                        <!-- Selection Range -->
+                        <div id="selection-box" class="absolute top-[24px] h-[60px] bg-zinc-500/20 border-y-2 border-zinc-400 cursor-move hidden group z-10">
+                            <!-- Out of bounds darkeners (using pseudo elements or separated divs handled by JS) -->
+                            
+                            <!-- Left Handle -->
+                            <div class="handle-hitbox left-0" id="handle-left">
+                                <div class="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-2 bg-zinc-300 rounded-full shadow"></div>
+                            </div>
+                            
+                            <!-- Right Handle -->
+                            <div class="handle-hitbox left-full" id="handle-right">
+                                <div class="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-2 bg-zinc-300 rounded-full shadow"></div>
+                            </div>
+                        </div>
+
+                        <!-- Left Darkener -->
+                        <div id="dark-left" class="absolute top-[24px] h-[60px] left-0 bg-black/60 pointer-events-none hidden"></div>
+                        <!-- Right Darkener -->
+                        <div id="dark-right" class="absolute top-[24px] h-[60px] bg-black/60 pointer-events-none hidden"></div>
+
+                        <!-- Playhead -->
+                        <div id="playhead" class="absolute top-0 bottom-0 w-[1px] bg-red-500 z-30 pointer-events-none hidden">
+                            <!-- Playhead Head Handle -->
+                            <div id="playhead-handle" class="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-4 bg-red-500 rounded-b pointer-events-auto cursor-col-resize flex justify-center shadow-md">
+                                <div class="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-white mt-1 opacity-50"></div>
+                            </div>
+                        </div>
+
+                        <!-- Clickable background layer for seeking -->
+                        <div id="timeline-bg-click" class="absolute top-[24px] w-full h-[60px] cursor-pointer z-0"></div>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Hidden Video for Thumbnail Extraction -->
+    <video id="thumb-video" class="hidden" muted playsinline></video>
+
+    <!-- AI Settings Modal -->
+    <div id="ai-settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="h-14 px-5 border-b border-zinc-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-zinc-100">AI Settings</h3>
+                    <p class="text-[11px] text-zinc-500 mt-0.5">WD EVA02 tag selection</p>
+                </div>
+                <button id="ai-settings-close-btn" class="w-8 h-8 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors flex items-center justify-center" aria-label="Close AI settings">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-6">
+                <section class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-semibold text-zinc-200">General threshold</div>
+                            <div class="text-[11px] text-zinc-500 mt-0.5">General tags below this confidence are removed.</div>
+                        </div>
+                        <span id="ai-general-threshold-value" class="font-mono text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 px-2 py-1 rounded-md">0.35</span>
+                    </div>
+                    <input id="ai-general-threshold" type="range" min="0" max="1" step="0.01" value="0.35" class="w-full">
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-semibold text-zinc-200">Character threshold</div>
+                            <div class="text-[11px] text-zinc-500 mt-0.5">Character tags below this confidence are removed.</div>
+                        </div>
+                        <span id="ai-character-threshold-value" class="font-mono text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 px-2 py-1 rounded-md">0.85</span>
+                    </div>
+                    <input id="ai-character-threshold" type="range" min="0" max="1" step="0.01" value="0.85" class="w-full">
+                </section>
+
+                <section>
+                    <div class="mb-2">
+                        <div class="text-xs font-semibold text-zinc-200">Tag blacklist</div>
+                        <div class="text-[11px] text-zinc-500 mt-0.5">One tag per line or comma-separated. Matching tags are excluded from the caption.</div>
+                    </div>
+                    <textarea id="ai-tag-blacklist" class="w-full h-36 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 resize-none font-mono" placeholder="1girl&#10;looking at viewer&#10;simple background"></textarea>
+                </section>
+            </div>
+
+            <div class="px-5 py-4 border-t border-zinc-800 bg-zinc-950/40 flex items-center justify-end gap-2">
+                <button id="ai-settings-cancel-btn" class="px-4 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Cancel</button>
+                <button id="ai-settings-save-btn" class="px-4 py-2 rounded-lg text-sm font-semibold bg-zinc-100 hover:bg-white text-zinc-950 transition-colors">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Progress Overlay -->
+    <div id="progress-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+        <div class="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-2xl w-96 max-w-[90vw] text-center">
+            <h3 class="text-xl font-bold text-zinc-950 mb-2">Exporting Clips</h3>
+            <p id="progress-text" class="text-sm text-zinc-400 mb-6">Processing clip 1 of X...</p>
+            
+            <div class="w-full bg-zinc-800 rounded-full h-3 mb-4 overflow-hidden">
+                <div id="progress-bar" class="bg-zinc-300 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            
+            <div class="text-xs text-yellow-500 bg-yellow-500/10 p-3 rounded text-left">
+                <span class="font-bold">Note:</span> Clips are recorded from the selected source range in real time.
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // State Management
+        const state = {
+            files: [], // { id, name, file, url, duration, fps, thumbnails: [] }
+            activeFileId: null,
+            clips: [], // { id, fileId, inTime, outTime, caption, duration }
+            zoom: 50, // pixels per second
+            currentTime: 0,
+            selection: { in: 0, out: 0 },
+            isPlaying: false,
+            isDragging: null, // 'playhead', 'selection', 'handle-left', 'handle-right'
+            dragStartX: 0,
+            dragStartValue: 0,
+            captionEngine: {
+                session: null,
+                labels: null,
+                index: null,
+                inputName: null,
+                outputName: null,
+                provider: null,
+                loading: null
+            },
+            aiSettings: {
+                generalThreshold: 0.35,
+                characterThreshold: 0.85,
+                blacklist: new Set()
+            }
+        };
+
+        // DOM Elements
+        const DOM = {
+            uploadInput: document.getElementById('upload-input'),
+            fileList: document.getElementById('file-list'),
+            clipList: document.getElementById('clip-list'),
+            fileCount: document.getElementById('file-count'),
+            clipCount: document.getElementById('clip-count'),
+            
+            mainVideo: document.getElementById('main-video'),
+            videoPlaceholder: document.getElementById('video-placeholder'),
+            overlayPlayBtn: document.getElementById('overlay-play-btn'),
+            
+            captionInput: document.getElementById('caption-input'),
+            aiCaptionBtn: document.getElementById('ai-caption-btn'),
+            createClipBtn: document.getElementById('create-clip-btn'),
+            aiSettingsBtn: document.getElementById('ai-settings-btn'),
+            aiSettingsModal: document.getElementById('ai-settings-modal'),
+            aiSettingsCloseBtn: document.getElementById('ai-settings-close-btn'),
+            aiSettingsCancelBtn: document.getElementById('ai-settings-cancel-btn'),
+            aiSettingsSaveBtn: document.getElementById('ai-settings-save-btn'),
+            aiGeneralThreshold: document.getElementById('ai-general-threshold'),
+            aiGeneralThresholdValue: document.getElementById('ai-general-threshold-value'),
+            aiCharacterThreshold: document.getElementById('ai-character-threshold'),
+            aiCharacterThresholdValue: document.getElementById('ai-character-threshold-value'),
+            aiTagBlacklist: document.getElementById('ai-tag-blacklist'),
+            
+            infoIn: document.getElementById('info-in'),
+            infoOut: document.getElementById('info-out'),
+            infoDur: document.getElementById('info-dur'),
+            
+            tlPlayBtn: document.getElementById('tl-play-btn'),
+            tlTimeDisplay: document.getElementById('tl-time-display'),
+            zoomSlider: document.getElementById('zoom-slider'),
+            
+            tlScrollWrapper: document.getElementById('timeline-scroll-wrapper'),
+            tlTrack: document.getElementById('timeline-track'),
+            rulerCanvas: document.getElementById('ruler-canvas'),
+            thumbnailsContainer: document.getElementById('thumbnails-container'),
+            
+            selectionBox: document.getElementById('selection-box'),
+            handleLeft: document.getElementById('handle-left'),
+            handleRight: document.getElementById('handle-right'),
+            darkLeft: document.getElementById('dark-left'),
+            darkRight: document.getElementById('dark-right'),
+            
+            playhead: document.getElementById('playhead'),
+            playheadHandle: document.getElementById('playhead-handle'),
+            tlBgClick: document.getElementById('timeline-bg-click'),
+            
+            exportBtn: document.getElementById('export-btn'),
+            progressOverlay: document.getElementById('progress-overlay'),
+            progressBar: document.getElementById('progress-bar'),
+            progressText: document.getElementById('progress-text'),
+
+            thumbVideo: document.getElementById('thumb-video')
+        };
+
+        // Utility: Format Time (MM:SS.ms)
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00.00";
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            const ms = Math.floor((seconds % 1) * 100).toString().padStart(2, '0');
+            return `${m}:${s}.${ms}`;
+        }
+
+        // Generate Unique ID
+        function generateId() {
+            return Math.random().toString(36).substring(2, 9);
+        }
+
+        // --- Event Listeners Initialization ---
+        function initEvents() {
+            DOM.uploadInput.addEventListener('change', handleUpload);
+            
+            // Video playback events
+            DOM.mainVideo.addEventListener('timeupdate', () => {
+                if(!state.isDragging) {
+                    state.currentTime = DOM.mainVideo.currentTime;
+                    updatePlayheadUI();
+                }
+            });
+            DOM.mainVideo.addEventListener('play', () => {
+                state.isPlaying = true;
+                updatePlayBtnUI();
+            });
+            DOM.mainVideo.addEventListener('pause', () => {
+                state.isPlaying = false;
+                updatePlayBtnUI();
+            });
+            DOM.mainVideo.addEventListener('ended', () => {
+                state.isPlaying = false;
+                updatePlayBtnUI();
+            });
+            DOM.mainVideo.addEventListener('loadedmetadata', onVideoLoaded);
+
+            // Controls
+            DOM.overlayPlayBtn.addEventListener('click', togglePlay);
+            DOM.tlPlayBtn.addEventListener('click', togglePlay);
+            DOM.zoomSlider.addEventListener('input', (e) => {
+                state.zoom = parseInt(e.target.value);
+                renderTimeline();
+            });
+
+            DOM.tlScrollWrapper.addEventListener('wheel', (e) => {
+                if (!e.ctrlKey) return;
+                e.preventDefault();
+
+                const file = getActiveFile();
+                if (!file) return;
+
+                const rect = DOM.tlScrollWrapper.getBoundingClientRect();
+                const pointerX = e.clientX - rect.left;
+                const timeAtPointer = (DOM.tlScrollWrapper.scrollLeft + pointerX) / state.zoom;
+                const direction = e.deltaY < 0 ? 1 : -1;
+                const nextZoom = Math.max(10, Math.min(300, state.zoom + direction * 10));
+
+                if (nextZoom === state.zoom) return;
+
+                state.zoom = nextZoom;
+                DOM.zoomSlider.value = String(nextZoom);
+                renderTimeline();
+                DOM.tlScrollWrapper.scrollLeft = Math.max(0, timeAtPointer * state.zoom - pointerX);
+            }, { passive: false });
+
+            // Timeline Dragging
+            DOM.playheadHandle.addEventListener('mousedown', (e) => startDrag(e, 'playhead'));
+            DOM.handleLeft.addEventListener('mousedown', (e) => startDrag(e, 'handle-left'));
+            DOM.handleRight.addEventListener('mousedown', (e) => startDrag(e, 'handle-right'));
+            DOM.selectionBox.addEventListener('mousedown', (e) => {
+                if (e.target === DOM.handleLeft || e.target === DOM.handleRight || DOM.handleLeft.contains(e.target) || DOM.handleRight.contains(e.target)) return;
+                e.stopPropagation();
+                startDrag(e, 'selection');
+            });
+            
+            DOM.tlBgClick.addEventListener('mousedown', (e) => {
+                const rect = DOM.tlTrack.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const time = Math.max(0, Math.min(x / state.zoom, getActiveFile().duration));
+                state.currentTime = time;
+                DOM.mainVideo.currentTime = time;
+                updatePlayheadUI();
+            });
+
+            window.addEventListener('mousemove', handleDrag);
+            window.addEventListener('mouseup', endDrag);
+
+            // Captioning & Clips
+            DOM.aiCaptionBtn.addEventListener('click', autoCaption);
+            DOM.createClipBtn.addEventListener('click', createClip);
+            DOM.exportBtn.addEventListener('click', exportZIP);
+            DOM.aiSettingsBtn.addEventListener('click', openAISettings);
+            DOM.aiSettingsCloseBtn.addEventListener('click', closeAISettings);
+            DOM.aiSettingsCancelBtn.addEventListener('click', closeAISettings);
+            DOM.aiSettingsSaveBtn.addEventListener('click', saveAISettings);
+            DOM.aiGeneralThreshold.addEventListener('input', () => DOM.aiGeneralThresholdValue.textContent = Number(DOM.aiGeneralThreshold.value).toFixed(2));
+            DOM.aiCharacterThreshold.addEventListener('input', () => DOM.aiCharacterThresholdValue.textContent = Number(DOM.aiCharacterThreshold.value).toFixed(2));
+            DOM.aiSettingsModal.addEventListener('mousedown', (e) => {
+                if (e.target === DOM.aiSettingsModal) closeAISettings();
+            });
+
+            // Resize observer for timeline ruler
+            window.addEventListener('resize', renderRuler);
+        }
+
+        function parseBlacklist(value) {
+            return new Set(String(value || "").split(/[\n,]+/).map(tag => tag.trim().replaceAll(" ", "_").toLowerCase()).filter(Boolean));
+        }
+
+        function openAISettings() {
+            DOM.aiGeneralThreshold.value = String(state.aiSettings.generalThreshold);
+            DOM.aiCharacterThreshold.value = String(state.aiSettings.characterThreshold);
+            DOM.aiGeneralThresholdValue.textContent = state.aiSettings.generalThreshold.toFixed(2);
+            DOM.aiCharacterThresholdValue.textContent = state.aiSettings.characterThreshold.toFixed(2);
+            DOM.aiTagBlacklist.value = Array.from(state.aiSettings.blacklist).map(tag => tag.replaceAll("_", " ")).join("\n");
+            DOM.aiSettingsModal.classList.remove('hidden');
+            DOM.aiSettingsModal.classList.add('flex');
+        }
+
+        function closeAISettings() {
+            DOM.aiSettingsModal.classList.add('hidden');
+            DOM.aiSettingsModal.classList.remove('flex');
+        }
+
+        function saveAISettings() {
+            state.aiSettings.generalThreshold = Number(DOM.aiGeneralThreshold.value);
+            state.aiSettings.characterThreshold = Number(DOM.aiCharacterThreshold.value);
+            state.aiSettings.blacklist = parseBlacklist(DOM.aiTagBlacklist.value);
+            closeAISettings();
+        }
+
+        // --- Video Upload & Loading ---
+        async function handleUpload(e) {
+            const newFiles = Array.from(e.target.files);
+            if (newFiles.length === 0) return;
+
+            for (const file of newFiles) {
+                const id = generateId();
+                const url = URL.createObjectURL(file);
+                
+                // Get duration via a temporary video element to not disrupt main
+                const duration = await new Promise((resolve) => {
+                    const v = document.createElement('video');
+                    v.preload = 'metadata';
+                    v.onloadedmetadata = () => resolve(v.duration);
+                    v.src = url;
+                });
+
+                state.files.push({
+                    id,
+                    name: file.name,
+                    file,
+                    url,
+                    duration,
+                    fps: 30, // Assumption as browser can't easily read exact FPS
+                    thumbnails: [] 
+                });
+            }
+
+            renderFileList();
+            if (!state.activeFileId && state.files.length > 0) {
+                selectFile(state.files[0].id);
+            }
+        }
+
+        function renderFileList() {
+            DOM.fileCount.textContent = state.files.length;
+            if (state.files.length === 0) {
+                DOM.fileList.innerHTML = '<div class="text-zinc-500 text-sm text-center mt-10">No videos uploaded.</div>';
+                return;
+            }
+
+            DOM.fileList.innerHTML = state.files.map(f => `
+                <div class="group flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${f.id === state.activeFileId ? 'bg-zinc-100/20 border border-zinc-500' : 'hover:bg-zinc-800 border border-transparent'}" onclick="selectFile('${f.id}')">
+                    <div class="flex items-center space-x-2 overflow-hidden">
+                        <svg class="w-4 h-4 text-zinc-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v12H4z" opacity="0.2"/><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm8-11l-4 5h3v4h2v-4h3l-4-5z" fill="none"/></svg>
+                        <span class="text-sm truncate ${f.id === state.activeFileId ? 'text-zinc-200 font-medium' : 'text-zinc-300'}">${f.name}</span>
+                    </div>
+                    <span class="text-xs text-zinc-500 shrink-0 ml-2">${formatTime(f.duration).split('.')[0]}</span>
+                </div>
+            `).join('');
+            
+            updateExportBtn();
+        }
+
+        function selectFile(id) {
+            const file = state.files.find(f => f.id === id);
+            if (!file) return;
+
+            state.activeFileId = id;
+            DOM.mainVideo.src = file.url;
+            DOM.mainVideo.classList.remove('hidden');
+            DOM.videoPlaceholder.classList.add('hidden');
+            DOM.overlayPlayBtn.classList.remove('hidden');
+            
+            DOM.captionInput.value = '';
+            
+            renderFileList();
+            
+            // Generate thumbnails in background
+            generateThumbnails(file);
+        }
+
+        function getActiveFile() {
+            return state.files.find(f => f.id === state.activeFileId);
+        }
+
+        function onVideoLoaded() {
+            const file = getActiveFile();
+            if (!file) return;
+            
+            // Initial selection 10% to 90%
+            state.selection.in = file.duration * 0.1;
+            state.selection.out = file.duration * 0.9;
+            state.currentTime = state.selection.in;
+            DOM.mainVideo.currentTime = state.currentTime;
+            
+            DOM.selectionBox.classList.remove('hidden');
+            DOM.playhead.classList.remove('hidden');
+            DOM.darkLeft.classList.remove('hidden');
+            DOM.darkRight.classList.remove('hidden');
+
+            renderTimeline();
+            updateSelectionUI();
+        }
+
+        // --- Playback Controls ---
+        function togglePlay() {
+            if(!getActiveFile()) return;
+            if (state.isPlaying) DOM.mainVideo.pause();
+            else {
+                // If at end of selection, loop back to in point
+                if(state.currentTime >= state.selection.out) {
+                    DOM.mainVideo.currentTime = state.selection.in;
+                }
+                DOM.mainVideo.play();
+            }
+        }
+
+        function updatePlayBtnUI() {
+            const icon = state.isPlaying ? 
+                '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : 
+                '<path d="M8 5v14l11-7z"/>';
+            DOM.tlPlayBtn.innerHTML = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">${icon}</svg>`;
+            DOM.overlayPlayBtn.innerHTML = `<div class="bg-zinc-100/80 p-4 rounded-full text-zinc-950 backdrop-blur-sm shadow-lg"><svg class="w-10 h-10 ml-1" fill="currentColor" viewBox="0 0 24 24">${icon}</svg></div>`;
+        }
+
+        // --- Timeline Rendering & Logic ---
+        function renderTimeline() {
+            const file = getActiveFile();
+            if (!file) return;
+
+            const totalWidth = file.duration * state.zoom;
+            DOM.tlTrack.style.width = `${totalWidth}px`;
+            
+            renderRuler();
+            renderThumbnailsUI();
+            updatePlayheadUI();
+            updateSelectionUI();
+        }
+
+        function renderRuler() {
+            const file = getActiveFile();
+            if (!file) return;
+
+            const canvas = DOM.rulerCanvas;
+            const ctx = canvas.getContext('2d');
+            const totalWidth = file.duration * state.zoom;
+            
+            // Set real pixel size for crispness
+            canvas.width = totalWidth;
+            canvas.height = 24;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#52525b'; // text-zinc-600
+            ctx.font = '10px Inter, sans-serif';
+            ctx.textBaseline = 'top';
+
+            // Draw ticks
+            // 1 sec major, minor ticks depending on zoom
+            const step = state.zoom < 30 ? 5 : 1; 
+
+            for (let s = 0; s <= file.duration; s += step) {
+                const x = s * state.zoom;
+                ctx.fillRect(x, 12, 1, 12);
+                
+                // Draw label every 5 secs or depending on zoom
+                if (s % (step * 5) === 0 || s === 0) {
+                    const mins = Math.floor(s / 60);
+                    const secs = Math.floor(s % 60).toString().padStart(2, '0');
+                    ctx.fillText(`${mins}:${secs}`, x + 3, 2);
+                    ctx.fillRect(x, 0, 1, 24); // Longer tick for labels
+                }
+            }
+        }
+
+        async function generateThumbnails(file) {
+            if (file.thumbnails && file.thumbnails.length > 0) {
+                renderThumbnailsUI();
+                return;
+            }
+
+            const video = DOM.thumbVideo;
+            video.src = file.url;
+            
+            await new Promise(r => { video.onloadeddata = r; });
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Fixed aspect ratio for thumbnails roughly
+            const aspect = video.videoWidth / video.videoHeight;
+            canvas.height = 60; // timeline thumbnail height
+            canvas.width = Math.floor(canvas.height * aspect);
+            
+            const interval = 2; // Capture every 2 seconds
+            file.thumbnails = [];
+            
+            for (let time = 0; time < file.duration; time += interval) {
+                video.currentTime = time;
+                await new Promise(r => { video.onseeked = r; });
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                file.thumbnails.push({
+                    time,
+                    data: canvas.toDataURL('image/jpeg', 0.5)
+                });
+                
+                // Partial render
+                if(file.id === state.activeFileId) renderThumbnailsUI();
+            }
+        }
+
+        function renderThumbnailsUI() {
+            const file = getActiveFile();
+            if (!file || !file.thumbnails) return;
+            
+            DOM.thumbnailsContainer.innerHTML = '';
+            
+            // Calculate width of each thumbnail block based on zoom
+            const interval = 2; // matches generator
+            const thumbWidth = interval * state.zoom;
+
+            file.thumbnails.forEach(t => {
+                const img = document.createElement('div');
+                img.style.width = `${thumbWidth}px`;
+                img.style.height = '100%';
+                img.style.backgroundImage = `url(${t.data})`;
+                img.style.backgroundSize = 'cover';
+                img.style.backgroundPosition = 'center';
+                img.style.borderRight = '1px solid rgba(255,255,255,0.1)';
+                img.className = 'shrink-0';
+                DOM.thumbnailsContainer.appendChild(img);
+            });
+        }
+
+        function updatePlayheadUI() {
+            const x = state.currentTime * state.zoom;
+            DOM.playhead.style.left = `${x}px`;
+            DOM.tlTimeDisplay.textContent = formatTime(state.currentTime);
+
+            // Auto-stop at out point during playback
+            if(state.isPlaying && state.currentTime >= state.selection.out) {
+                DOM.mainVideo.pause();
+                DOM.mainVideo.currentTime = state.selection.out;
+                state.currentTime = state.selection.out;
+                DOM.playhead.style.left = `${state.selection.out * state.zoom}px`;
+            }
+        }
+
+        function updateSelectionUI() {
+            const file = getActiveFile();
+            if(!file) return;
+
+            const x = state.selection.in * state.zoom;
+            const w = (state.selection.out - state.selection.in) * state.zoom;
+            
+            DOM.selectionBox.style.left = `${x}px`;
+            DOM.selectionBox.style.width = `${w}px`;
+            
+            DOM.darkLeft.style.width = `${x}px`;
+            DOM.darkRight.style.left = `${x + w}px`;
+            DOM.darkRight.style.width = `${(file.duration * state.zoom) - (x + w)}px`;
+
+            DOM.infoIn.textContent = formatTime(state.selection.in);
+            DOM.infoOut.textContent = formatTime(state.selection.out);
+            DOM.infoDur.textContent = formatTime(state.selection.out - state.selection.in);
+        }
+
+        // --- Dragging Logic ---
+        function startDrag(e, type) {
+            e.preventDefault();
+            const file = getActiveFile();
+            if(!file) return;
+
+            state.isDragging = type;
+            state.dragStartX = e.clientX;
+            
+            if(type === 'playhead') state.dragStartValue = state.currentTime;
+            else if(type === 'handle-left') state.dragStartValue = state.selection.in;
+            else if(type === 'handle-right') state.dragStartValue = state.selection.out;
+            else if(type === 'selection') state.dragStartValue = state.selection.in; // Base ref
+            
+            if(state.isPlaying) DOM.mainVideo.pause();
+            
+            document.body.classList.add('no-select', type === 'playhead' || type.startsWith('handle') ? 'cursor-ew-resize' : 'cursor-move');
+        }
+
+        function handleDrag(e) {
+            if (!state.isDragging) return;
+            const file = getActiveFile();
+            
+            const dx = e.clientX - state.dragStartX;
+            const dt = dx / state.zoom;
+            
+            if (state.isDragging === 'playhead') {
+                let t = state.dragStartValue + dt;
+                t = Math.max(0, Math.min(t, file.duration));
+                state.currentTime = t;
+                DOM.mainVideo.currentTime = t;
+                updatePlayheadUI();
+                
+                // Auto scroll timeline if dragging near edges
+                autoScrollTimeline(e.clientX);
+            } 
+            else if (state.isDragging === 'handle-left') {
+                let t = state.dragStartValue + dt;
+                t = Math.max(0, Math.min(t, state.selection.out - 0.1)); // min 0.1s gap
+                state.selection.in = t;
+                updateSelectionUI();
+                DOM.mainVideo.currentTime = t;
+                state.currentTime = t;
+                updatePlayheadUI();
+            }
+            else if (state.isDragging === 'handle-right') {
+                let t = state.dragStartValue + dt;
+                t = Math.max(state.selection.in + 0.1, Math.min(t, file.duration));
+                state.selection.out = t;
+                updateSelectionUI();
+                DOM.mainVideo.currentTime = t;
+                state.currentTime = t;
+                updatePlayheadUI();
+            }
+            else if (state.isDragging === 'selection') {
+                const dur = state.selection.out - state.selection.in;
+                let tIn = state.dragStartValue + dt;
+
+                if (tIn < 0) tIn = 0;
+                if (tIn + dur > file.duration) tIn = file.duration - dur;
+
+                state.selection.in = tIn;
+                state.selection.out = tIn + dur;
+                updateSelectionUI();
+                DOM.mainVideo.currentTime = tIn;
+                state.currentTime = tIn;
+                updatePlayheadUI();
+                autoScrollTimeline(e.clientX);
+            }
+        }
+
+        function endDrag() {
+            if (state.isDragging) {
+                state.isDragging = null;
+                document.body.classList.remove('no-select', 'cursor-ew-resize', 'cursor-move');
+            }
+        }
+
+        function autoScrollTimeline(clientX) {
+            const wrapper = DOM.tlScrollWrapper;
+            const rect = wrapper.getBoundingClientRect();
+            const margin = 50;
+            
+            if (clientX < rect.left + margin) {
+                wrapper.scrollLeft -= 10;
+            } else if (clientX > rect.right - margin) {
+                wrapper.scrollLeft += 10;
+            }
+        }
+
+        // --- WD EVA02 Captioning ---
+        const CAPTION_MODEL_BASE = "https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main";
+        const CAPTION_MODEL_URL = `${CAPTION_MODEL_BASE}/model.onnx`;
+        const CAPTION_TAGS_URL = `${CAPTION_MODEL_BASE}/selected_tags.csv`;
+        const CAPTION_INDEX_URL = "https://raw.githubusercontent.com/szkr01/situation_caption_app/main/data/danbooru_tag_group_index.json";
+        const CAPTION_ADDITIONAL_INDEX_URL = "https://raw.githubusercontent.com/szkr01/situation_caption_app/main/data/character_additional_tag_group_index.json";
+        const CAPTION_IMAGE_SIZE = 448;
+        const CATEGORY_CHARACTER = 4;
+        const CATEGORY_RATING = 9;
+        const KEEP_TAG_GROUPS = new Set([
+            "tag_group:ass",
+            "tag_group:backgrounds",
+            "tag_group:body_parts",
+            "tag_group:breasts_tags",
+            "tag_group:colors",
+            "tag_group:face_tags",
+            "tag_group:feet",
+            "tag_group:focus_tags",
+            "tag_group:gestures",
+            "tag_group:hands",
+            "tag_group:nudity",
+            "tag_group:penis",
+            "tag_group:posture",
+            "tag_group:pussy",
+            "tag_group:sex_acts",
+            "tag_group:sex_objects",
+            "tag_group:sexual_attire",
+            "tag_group:sexual_positions",
+            "tag_group:subjective",
+            "tag_group:symbols",
+            "tag_group:water",
+            "tag_group:image_composition",
+            "tag_group:lighting",
+            "tag_group:censorship",
+            "tag_group:simulated_sex_acts"
+        ]);
+
+        function parseCsv(text) {
+            const rows = [];
+            let row = [];
+            let value = "";
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i += 1) {
+                const ch = text[i];
+                const next = text[i + 1];
+
+                if (inQuotes) {
+                    if (ch === '"' && next === '"') {
+                        value += '"';
+                        i += 1;
+                    } else if (ch === '"') {
+                        inQuotes = false;
+                    } else {
+                        value += ch;
+                    }
+                    continue;
+                }
+
+                if (ch === '"') {
+                    inQuotes = true;
+                } else if (ch === ",") {
+                    row.push(value);
+                    value = "";
+                } else if (ch === "\n") {
+                    row.push(value);
+                    rows.push(row);
+                    row = [];
+                    value = "";
+                } else if (ch !== "\r") {
+                    value += ch;
+                }
+            }
+
+            if (value.length > 0 || row.length > 0) {
+                row.push(value);
+                rows.push(row);
+            }
+            return rows;
+        }
+
+        function loadLabelsFromCsv(csvText) {
+            const rows = parseCsv(csvText).filter(row => row.some(cell => String(cell).trim() !== ""));
+            if (rows.length < 2) throw new Error("selected_tags.csv has no tag rows.");
+
+            const header = rows[0].map(cell => cell.trim());
+            const nameIndex = header.indexOf("name");
+            const categoryIndex = header.indexOf("category");
+            if (nameIndex < 0 || categoryIndex < 0) throw new Error("selected_tags.csv is missing name/category columns.");
+
+            return rows.slice(1).map((row, index) => ({
+                index,
+                name: (row[nameIndex] || "").trim(),
+                category: Number((row[categoryIndex] || "").trim())
+            })).filter(label => label.name);
+        }
+
+        function mergeIndices(baseIndex, additionalIndex) {
+            const merged = {
+                group_parents: { ...(baseIndex.group_parents || {}) },
+                tags: {}
+            };
+
+            for (const [tag, memberships] of Object.entries(baseIndex.tags || {})) {
+                merged.tags[tag] = Array.isArray(memberships) ? memberships.map(item => ({ ...item })) : [];
+            }
+
+            for (const [group, parents] of Object.entries(additionalIndex.group_parents || {})) {
+                const target = merged.group_parents[group] || (merged.group_parents[group] = []);
+                for (const parent of parents || []) {
+                    if (!target.includes(parent)) target.push(parent);
+                }
+            }
+
+            for (const [tag, memberships] of Object.entries(additionalIndex.tags || {})) {
+                const target = merged.tags[tag] || (merged.tags[tag] = []);
+                const seen = new Set(target.map(item => JSON.stringify([item.page, item.sections || [], item.title])));
+                for (const membership of memberships || []) {
+                    const key = JSON.stringify([membership.page, membership.sections || [], membership.title]);
+                    if (seen.has(key)) continue;
+                    target.push({ ...membership });
+                    seen.add(key);
+                }
+            }
+
+            return merged;
+        }
+
+        async function fetchText(url) {
+            const response = await fetch(url, { cache: "force-cache" });
+            if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+            return response.text();
+        }
+
+        async function fetchJson(url) {
+            const response = await fetch(url, { cache: "force-cache" });
+            if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+            return response.json();
+        }
+
+        async function loadCaptionEngine() {
+            if (state.captionEngine.loading) return state.captionEngine.loading;
+
+            state.captionEngine.loading = (async () => {
+                if (!window.ort) throw new Error("onnxruntime-web failed to load.");
+
+                const [csvText, baseIndex, additionalIndex] = await Promise.all([
+                    fetchText(CAPTION_TAGS_URL),
+                    fetchJson(CAPTION_INDEX_URL),
+                    fetchJson(CAPTION_ADDITIONAL_INDEX_URL)
+                ]);
+
+                state.captionEngine.labels = loadLabelsFromCsv(csvText);
+                state.captionEngine.index = mergeIndices(baseIndex, additionalIndex);
+
+                ort.env.wasm.numThreads = 1;
+                ort.env.wasm.simd = true;
+                ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.25.1/dist/";
+
+                const plans = navigator.gpu
+                    ? [
+                        { provider: "WebGPU", executionProviders: ["webgpu", "wasm"] },
+                        { provider: "WASM", executionProviders: ["wasm"] }
+                    ]
+                    : [
+                        { provider: "WASM", executionProviders: ["wasm"] }
+                    ];
+
+                let lastError = null;
+                for (const plan of plans) {
+                    try {
+                        const session = await ort.InferenceSession.create(CAPTION_MODEL_URL, {
+                            executionProviders: plan.executionProviders,
+                            graphOptimizationLevel: "all"
+                        });
+                        state.captionEngine.session = session;
+                        state.captionEngine.inputName = session.inputNames[0];
+                        state.captionEngine.outputName = session.outputNames[0];
+                        state.captionEngine.provider = plan.provider;
+                        return;
+                    } catch (error) {
+                        console.error(`${plan.provider} initialization failed`, error);
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error("Failed to create ONNX inference session.");
+            })();
+
+            return state.captionEngine.loading;
+        }
+
+        function captureVideoFrameTensor(video) {
+            const size = CAPTION_IMAGE_SIZE;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            if (!ctx) throw new Error("Failed to get Canvas 2D context.");
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, size, size);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
+            const sourceSize = Math.max(video.videoWidth, video.videoHeight);
+            if (!sourceSize) throw new Error("Video dimensions are unavailable.");
+
+            const scale = size / sourceSize;
+            const drawWidth = Math.round(video.videoWidth * scale);
+            const drawHeight = Math.round(video.videoHeight * scale);
+            const dx = Math.floor((size - drawWidth) / 2);
+            const dy = Math.floor((size - drawHeight) / 2);
+            ctx.drawImage(video, dx, dy, drawWidth, drawHeight);
+
+            const rgba = ctx.getImageData(0, 0, size, size).data;
+            const input = new Float32Array(size * size * 3);
+            let j = 0;
+
+            for (let i = 0; i < rgba.length; i += 4) {
+                input[j++] = rgba[i + 2];
+                input[j++] = rgba[i + 1];
+                input[j++] = rgba[i];
+            }
+
+            return new ort.Tensor("float32", input, [1, size, size, 3]);
+        }
+
+        function normalizeProbability(value) {
+            if (value >= 0 && value <= 1) return value;
+            return 1 / (1 + Math.exp(-value));
+        }
+
+        function normalizeCaptionTag(value) {
+            return String(value || "").trim().replaceAll(" ", "_").toLowerCase();
+        }
+
+        function buildSituationCaption(probabilities) {
+            const labels = state.captionEngine.labels;
+            const index = state.captionEngine.index;
+
+            if (probabilities.length !== labels.length) throw new Error(`Model output/label count mismatch: ${probabilities.length} != ${labels.length}`);
+
+            const outputTags = [];
+
+            for (let i = 0; i < labels.length; i += 1) {
+                const label = labels[i];
+                if (!label || label.category === CATEGORY_RATING) continue;
+
+                const rawProbability = Number(probabilities[i]);
+                if (!Number.isFinite(rawProbability)) throw new Error(`Invalid model output at index ${i}: ${probabilities[i]}`);
+
+                const probability = normalizeProbability(rawProbability);
+                const threshold = label.category === CATEGORY_CHARACTER ? state.aiSettings.characterThreshold : state.aiSettings.generalThreshold;
+                if (probability < threshold) continue;
+
+                const normalizedTag = normalizeCaptionTag(label.name);
+                if (state.aiSettings.blacklist.has(normalizedTag)) continue;
+
+                if (label.category === CATEGORY_CHARACTER) {
+                    outputTags.push(label.name.replaceAll("_", " "));
+                    continue;
+                }
+
+                const memberships = index.tags?.[normalizedTag] || [];
+                if (!memberships.some(membership => KEEP_TAG_GROUPS.has(String(membership.page || "")))) continue;
+
+                outputTags.push(label.name.replaceAll("_", " "));
+            }
+
+            return outputTags.join(", ");
+        }
+
+        async function autoCaption() {
+            const file = getActiveFile();
+            if (!file) return;
+
+            const btn = DOM.aiCaptionBtn;
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin w-3.5 h-3.5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading model...</span>`;
+
+            try {
+                await loadCaptionEngine();
+                btn.innerHTML = `<svg class="animate-spin w-3.5 h-3.5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Analyzing...</span>`;
+
+                const tensor = captureVideoFrameTensor(DOM.mainVideo);
+                const outputMap = await state.captionEngine.session.run({ [state.captionEngine.inputName]: tensor });
+                const output = outputMap[state.captionEngine.outputName];
+                if (!output || !output.data) throw new Error("ONNX output tensor is missing.");
+
+                const probabilities = Float32Array.from(output.data);
+                DOM.captionInput.value = buildSituationCaption(probabilities);
+            } catch (error) {
+                console.error("Auto caption failed", error);
+                DOM.captionInput.value = `ERROR: ${error?.message || String(error)}`;
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+
+        // --- Clip Creation ---
+        function createClip() {
+            const file = getActiveFile();
+            if(!file) return;
+
+            const caption = DOM.captionInput.value.trim();
+            const clip = {
+                id: generateId(),
+                fileId: file.id,
+                fileName: file.name,
+                inTime: state.selection.in,
+                outTime: state.selection.out,
+                duration: state.selection.out - state.selection.in,
+                caption: caption || "No caption"
+            };
+
+            state.clips.push(clip);
+            renderClipList();
+            
+            // Visual feedback
+            const btn = DOM.createClipBtn;
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg><span>Saved</span>`;
+            setTimeout(() => btn.innerHTML = origHTML, 1000);
+        }
+
+        function renderClipList() {
+            DOM.clipCount.textContent = state.clips.length;
+            if (state.clips.length === 0) {
+                DOM.clipList.innerHTML = '<div class="text-zinc-500 text-sm text-center mt-10">No clips created yet.</div>';
+                updateExportBtn();
+                return;
+            }
+
+            DOM.clipList.innerHTML = state.clips.map((c, index) => `
+                <div class="bg-zinc-800 rounded-lg p-2.5 border border-zinc-700 hover:border-zinc-500 cursor-pointer transition-colors group" onclick="jumpToClip('${c.id}')">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-xs font-semibold text-zinc-200">Clip ${index + 1}</span>
+                        <div class="text-[10px] text-zinc-400 font-mono bg-zinc-900 px-1.5 py-0.5 rounded">
+                            ${formatTime(c.inTime).split('.')[0]} - ${formatTime(c.outTime).split('.')[0]}
+                        </div>
+                    </div>
+                    <div class="text-xs text-zinc-500 truncate mb-1" title="${c.fileName}">${c.fileName}</div>
+                    <div class="text-sm text-zinc-200 line-clamp-2 italic leading-tight">"${c.caption}"</div>
+                    <div class="mt-2 text-right">
+                        <button onclick="event.stopPropagation(); deleteClip('${c.id}')" class="text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            updateExportBtn();
+        }
+
+        function jumpToClip(id) {
+            const clip = state.clips.find(c => c.id === id);
+            if(!clip) return;
+
+            if (state.activeFileId !== clip.fileId) {
+                selectFile(clip.fileId);
+            }
+
+            state.selection.in = clip.inTime;
+            state.selection.out = clip.outTime;
+            DOM.captionInput.value = clip.caption === "No caption" ? "" : clip.caption;
+            
+            state.currentTime = clip.inTime;
+            DOM.mainVideo.currentTime = clip.inTime;
+            
+            updateSelectionUI();
+            updatePlayheadUI();
+        }
+
+        function deleteClip(id) {
+            state.clips = state.clips.filter(c => c.id !== id);
+            renderClipList();
+        }
+
+        function updateExportBtn() {
+            DOM.exportBtn.disabled = state.clips.length === 0;
+        }
+
+        // --- Export & MediaRecorder Logic ---
+        async function exportZIP() {
+            if(state.clips.length === 0) return;
+
+            DOM.progressOverlay.classList.remove('hidden');
+            const zip = new JSZip();
+            let csvContent = "video,prompt,input_audio,frame_rate\n";
+
+            try {
+                for (let i = 0; i < state.clips.length; i++) {
+                    const clip = state.clips[i];
+                    DOM.progressText.textContent = `Recording clip ${i + 1} of ${state.clips.length}... (${clip.fileName})`;
+                    DOM.progressBar.style.width = `${((i) / state.clips.length) * 100}%`;
+
+                    const fileInfo = state.files.find(f => f.id === clip.fileId);
+                    
+                    // Fallback to mp4 name but use webm if browser forces it
+                    let ext = 'webm';
+                    let mime = 'video/webm';
+                    if (MediaRecorder.isTypeSupported('video/mp4')) {
+                        ext = 'mp4';
+                        mime = 'video/mp4';
+                    }
+
+                    const outFilename = `clip_${i+1}_${clip.fileName.split('.')[0]}.${ext}`;
+                    
+                    // Start Recording Process
+                    const blob = await recordClip(fileInfo.url, clip.inTime, clip.outTime, mime);
+                    zip.file(outFilename, blob);
+
+                    // Add to CSV
+                    // CSV spec: video,prompt,input_audio,frame_rate
+                    // Note: prompt needs to be escaped if contains quotes/commas
+                    const safeCaption = `"${clip.caption.replace(/"/g, '""')}"`;
+                    csvContent += `${outFilename},${safeCaption},${outFilename},${fileInfo.fps}\n`;
+                }
+
+                DOM.progressText.textContent = `Packaging ZIP file...`;
+                DOM.progressBar.style.width = `100%`;
+
+                zip.file("metadata.csv", csvContent);
+                
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+                saveAs(zipBlob, "clips_export.zip");
+
+            } catch (err) {
+                console.error("Export failed:", err);
+                alert("An error occurred during export. See console for details.");
+            } finally {
+                DOM.progressOverlay.classList.add('hidden');
+            }
+        }
+
+        function recordClip(videoUrl, inTime, outTime, mimeType) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.src = videoUrl;
+                video.crossOrigin = 'anonymous';
+                video.muted = false; // Need audio
+                // Force video display hidden but active in DOM slightly helps captureStream
+                video.style.display = 'none';
+                document.body.appendChild(video);
+
+                let recorder;
+                const chunks = [];
+
+                video.onloadeddata = () => {
+                    video.currentTime = inTime;
+                };
+
+                video.onseeked = () => {
+                    if (video.currentTime >= outTime) return; // safety
+                    
+                    try {
+                        const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+                        recorder = new MediaRecorder(stream, { mimeType });
+                        
+                        recorder.ondataavailable = e => {
+                            if (e.data.size > 0) chunks.push(e.data);
+                        };
+                        
+                        recorder.onstop = () => {
+                            const blob = new Blob(chunks, { type: mimeType });
+                            document.body.removeChild(video);
+                            resolve(blob);
+                        };
+
+                        recorder.start();
+                        video.play().catch(reject);
+
+                    } catch (e) {
+                        document.body.removeChild(video);
+                        reject(e);
+                    }
+                };
+
+                video.ontimeupdate = () => {
+                    if (video.currentTime >= outTime && recorder && recorder.state === 'recording') {
+                        recorder.stop();
+                        video.pause();
+                    }
+                };
+
+                video.onerror = (e) => {
+                    document.body.removeChild(video);
+                    reject(e);
+                };
+            });
+        }
+
+        // Initialize App
+        initEvents();
+
+    </script>
+</body>
+</html>
