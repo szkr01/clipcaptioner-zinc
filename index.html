@@ -8,6 +8,14 @@
     <meta name="page:icon" content="🎬">
     <meta name="page:color" content="#09090b">
 
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (const registration of registrations) registration.unregister();
+            }).catch(error => console.error("Service Worker cleanup failed", error));
+        }
+    </script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -113,6 +121,13 @@
                 <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 16v-2m6-6h2M4 12h2m10.243-4.243 1.414-1.414M6.343 17.657l1.414-1.414m8.486 1.414 1.414 1.414M6.343 6.343l1.414 1.414"></path><circle cx="12" cy="12" r="3"></circle></svg>
                 <span>AI Settings</span>
             </button>
+            <div class="flex items-center bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden">
+                <span class="px-2.5 text-[10px] uppercase tracking-wider font-semibold text-zinc-500">Engine</span>
+                <select id="export-engine-select" class="bg-zinc-900 border-l border-zinc-800 text-xs text-zinc-200 px-2.5 py-2 cursor-pointer">
+                    <option value="webcodecs">WebCodecs (HW)</option>
+                    <option value="ffmpeg">FFmpeg (WASM)</option>
+                </select>
+            </div>
             <button id="export-btn" class="bg-zinc-100 hover:bg-white text-zinc-950 text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 <span>Export ZIP</span>
@@ -204,6 +219,7 @@
                                 <span>Duration:</span>
                                 <span id="info-dur" class="text-zinc-300 font-mono">00:00.00</span>
                             </div>
+                            <div id="duration-drag-hint" class="pt-1 text-[10px] text-zinc-600">Horizontal: move · Vertical: duration · Snap: 1 frame</div>
                         </div>
 
                         <!-- Create Clip Button -->
@@ -224,7 +240,7 @@
                         <button id="tl-play-btn" class="text-zinc-300 hover:text-zinc-950 p-1 rounded hover:bg-zinc-700 transition">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         </button>
-                        <span id="tl-time-display" class="font-mono text-sm text-zinc-300 font-medium tracking-wider">00:00.00</span>
+                        <span id="tl-time-display" class="font-mono text-xs text-zinc-300 font-medium tracking-wide whitespace-nowrap">SOURCE 00:00.00 · CLIP 00:00.00 / 00:00.00</span>
                     </div>
                     
                     <div class="flex items-center space-x-3 w-48">
@@ -336,17 +352,37 @@
     </div>
 
     <!-- Export Progress Overlay -->
-    <div id="progress-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
-        <div class="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-2xl w-96 max-w-[90vw] text-center">
-            <h3 class="text-xl font-bold text-zinc-950 mb-2">Exporting Clips</h3>
-            <p id="progress-text" class="text-sm text-zinc-400 mb-6">Processing clip 1 of X...</p>
-            
-            <div class="w-full bg-zinc-800 rounded-full h-3 mb-4 overflow-hidden">
-                <div id="progress-bar" class="bg-zinc-300 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+    <div id="progress-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-zinc-100">Export</h3>
+                    <p id="progress-stage" class="text-[11px] text-zinc-500 mt-0.5">Preparing</p>
+                </div>
+                <div id="progress-percent" class="font-mono text-sm text-zinc-300">0%</div>
             </div>
-            
-            <div class="text-xs text-yellow-500 bg-yellow-500/10 p-3 rounded text-left">
-                <span class="font-bold">Note:</span> Clips are recorded from the selected source range in real time.
+
+            <div class="p-5 space-y-4">
+                <div>
+                    <div class="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-zinc-200 rounded-full transition-[width] duration-150" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between mt-2 text-[11px] text-zinc-500">
+                        <span id="progress-text">Starting export...</span>
+                        <span id="progress-count" class="font-mono">0 / 0</span>
+                    </div>
+                </div>
+
+                <div class="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
+                    <div id="export-log-label" class="px-3 py-2 border-b border-zinc-800 text-[10px] uppercase tracking-wider font-semibold text-zinc-500">WebCodecs</div>
+                    <pre id="export-log" class="h-28 overflow-y-auto p-3 text-[10px] leading-relaxed font-mono text-zinc-400 whitespace-pre-wrap break-all"></pre>
+                </div>
+
+                <div id="export-error" class="hidden bg-red-950/30 border border-red-900/60 rounded-xl p-3 text-xs text-red-300 whitespace-pre-wrap break-all"></div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-zinc-800 bg-zinc-950/40 flex justify-end">
+                <button id="export-close-btn" class="hidden px-4 py-2 rounded-lg text-sm font-medium bg-zinc-100 hover:bg-white text-zinc-950 transition-colors">Close</button>
             </div>
         </div>
     </div>
@@ -364,7 +400,12 @@
             isPlaying: false,
             isDragging: null, // 'playhead', 'selection', 'handle-left', 'handle-right'
             dragStartX: 0,
+            dragStartY: 0,
             dragStartValue: 0,
+            dragStartCurrentTime: 0,
+            dragStartIn: 0,
+            dragStartOut: 0,
+            dragAxis: null,
             captionEngine: {
                 session: null,
                 labels: null,
@@ -378,6 +419,14 @@
                 generalThreshold: 0.35,
                 characterThreshold: 0.85,
                 blacklist: new Set()
+            },
+            exportEngine: {
+                mode: 'webcodecs',
+                worker: null,
+                loading: null,
+                active: false,
+                requestId: 0,
+                pending: new Map()
             }
         };
 
@@ -431,9 +480,17 @@
             tlBgClick: document.getElementById('timeline-bg-click'),
             
             exportBtn: document.getElementById('export-btn'),
+            exportEngineSelect: document.getElementById('export-engine-select'),
             progressOverlay: document.getElementById('progress-overlay'),
             progressBar: document.getElementById('progress-bar'),
             progressText: document.getElementById('progress-text'),
+            progressStage: document.getElementById('progress-stage'),
+            progressPercent: document.getElementById('progress-percent'),
+            progressCount: document.getElementById('progress-count'),
+            exportLog: document.getElementById('export-log'),
+            exportLogLabel: document.getElementById('export-log-label'),
+            exportError: document.getElementById('export-error'),
+            exportCloseBtn: document.getElementById('export-close-btn'),
 
             thumbVideo: document.getElementById('thumb-video')
         };
@@ -458,10 +515,22 @@
             
             // Video playback events
             DOM.mainVideo.addEventListener('timeupdate', () => {
-                if(!state.isDragging) {
-                    state.currentTime = DOM.mainVideo.currentTime;
+                if (state.isDragging) return;
+
+                const file = getActiveFile();
+                if (!file) return;
+
+                const currentTime = DOM.mainVideo.currentTime;
+
+                if (state.isPlaying && currentTime >= state.selection.out) {
+                    state.currentTime = state.selection.in;
+                    DOM.mainVideo.currentTime = state.selection.in;
                     updatePlayheadUI();
+                    return;
                 }
+
+                state.currentTime = currentTime;
+                updatePlayheadUI();
             });
             DOM.mainVideo.addEventListener('play', () => {
                 state.isPlaying = true;
@@ -472,6 +541,15 @@
                 updatePlayBtnUI();
             });
             DOM.mainVideo.addEventListener('ended', () => {
+                const file = getActiveFile();
+
+                if (file && state.selection.out >= file.duration - (0.5 / getActiveFps())) {
+                    state.currentTime = state.selection.in;
+                    DOM.mainVideo.currentTime = state.selection.in;
+                    DOM.mainVideo.play().catch(error => console.error('Loop playback failed', error));
+                    return;
+                }
+
                 state.isPlaying = false;
                 updatePlayBtnUI();
             });
@@ -515,14 +593,9 @@
                 e.stopPropagation();
                 startDrag(e, 'selection');
             });
-            
+
             DOM.tlBgClick.addEventListener('mousedown', (e) => {
-                const rect = DOM.tlTrack.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const time = Math.max(0, Math.min(x / state.zoom, getActiveFile().duration));
-                state.currentTime = time;
-                DOM.mainVideo.currentTime = time;
-                updatePlayheadUI();
+                seekTimelineAtClientX(e.clientX);
             });
 
             window.addEventListener('mousemove', handleDrag);
@@ -532,6 +605,11 @@
             DOM.aiCaptionBtn.addEventListener('click', autoCaption);
             DOM.createClipBtn.addEventListener('click', createClip);
             DOM.exportBtn.addEventListener('click', exportZIP);
+            DOM.exportEngineSelect.addEventListener('change', () => {
+                state.exportEngine.mode = DOM.exportEngineSelect.value;
+                updateExportEngineUI();
+            });
+            DOM.exportCloseBtn.addEventListener('click', closeExportModal);
             DOM.aiSettingsBtn.addEventListener('click', openAISettings);
             DOM.aiSettingsCloseBtn.addEventListener('click', closeAISettings);
             DOM.aiSettingsCancelBtn.addEventListener('click', closeAISettings);
@@ -570,6 +648,40 @@
             state.aiSettings.characterThreshold = Number(DOM.aiCharacterThreshold.value);
             state.aiSettings.blacklist = parseBlacklist(DOM.aiTagBlacklist.value);
             closeAISettings();
+        }
+
+        function seekTimelineAtClientX(clientX) {
+            const file = getActiveFile();
+            if (!file) return;
+
+            const rect = DOM.tlTrack.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const time = Math.max(0, Math.min(x / state.zoom, file.duration));
+            state.currentTime = time;
+            DOM.mainVideo.currentTime = time;
+            updatePlayheadUI();
+        }
+
+        function ensureSelectionVisible() {
+            const file = getActiveFile();
+            if (!file) return;
+
+            const viewportWidth = DOM.tlScrollWrapper.clientWidth;
+            if (viewportWidth <= 0) return;
+
+            const padding = 24;
+            const duration = Math.max(0.001, state.selection.out - state.selection.in);
+            const selectionWidth = duration * state.zoom;
+
+            if (selectionWidth > viewportWidth - padding * 2) {
+                const fitZoom = Math.max(10, Math.min(300, (viewportWidth - padding * 2) / duration));
+                state.zoom = fitZoom;
+                DOM.zoomSlider.value = String(Math.round(fitZoom));
+                renderTimeline();
+            }
+
+            const selectionLeft = state.selection.in * state.zoom;
+            DOM.tlScrollWrapper.scrollLeft = Math.max(0, selectionLeft - padding);
         }
 
         // --- Video Upload & Loading ---
@@ -651,33 +763,37 @@
         function onVideoLoaded() {
             const file = getActiveFile();
             if (!file) return;
-            
-            // Initial selection 10% to 90%
-            state.selection.in = file.duration * 0.1;
-            state.selection.out = file.duration * 0.9;
+
+            state.selection.in = 0;
+            state.selection.out = Math.min(file.duration, snapDurationToFrame(Math.min(5, file.duration), Math.max(1, Number(file.fps) || 30)));
             state.currentTime = state.selection.in;
             DOM.mainVideo.currentTime = state.currentTime;
-            
+
             DOM.selectionBox.classList.remove('hidden');
             DOM.playhead.classList.remove('hidden');
             DOM.darkLeft.classList.remove('hidden');
             DOM.darkRight.classList.remove('hidden');
 
             renderTimeline();
-            updateSelectionUI();
+            ensureSelectionVisible();
         }
 
         // --- Playback Controls ---
         function togglePlay() {
-            if(!getActiveFile()) return;
-            if (state.isPlaying) DOM.mainVideo.pause();
-            else {
-                // If at end of selection, loop back to in point
-                if(state.currentTime >= state.selection.out) {
-                    DOM.mainVideo.currentTime = state.selection.in;
-                }
-                DOM.mainVideo.play();
+            if (!getActiveFile()) return;
+
+            if (state.isPlaying) {
+                DOM.mainVideo.pause();
+                return;
             }
+
+            if (state.currentTime < state.selection.in || state.currentTime >= state.selection.out) {
+                state.currentTime = state.selection.in;
+                DOM.mainVideo.currentTime = state.selection.in;
+                updatePlayheadUI();
+            }
+
+            DOM.mainVideo.play();
         }
 
         function updatePlayBtnUI() {
@@ -798,16 +914,14 @@
 
         function updatePlayheadUI() {
             const x = state.currentTime * state.zoom;
-            DOM.playhead.style.left = `${x}px`;
-            DOM.tlTimeDisplay.textContent = formatTime(state.currentTime);
+            const clipDuration = Math.max(0, state.selection.out - state.selection.in);
+            const insideClip = state.currentTime >= state.selection.in && state.currentTime <= state.selection.out;
+            const clipTime = Math.max(0, Math.min(state.currentTime - state.selection.in, clipDuration));
 
-            // Auto-stop at out point during playback
-            if(state.isPlaying && state.currentTime >= state.selection.out) {
-                DOM.mainVideo.pause();
-                DOM.mainVideo.currentTime = state.selection.out;
-                state.currentTime = state.selection.out;
-                DOM.playhead.style.left = `${state.selection.out * state.zoom}px`;
-            }
+            DOM.playhead.style.left = `${x}px`;
+            DOM.tlTimeDisplay.textContent = insideClip
+                ? `SOURCE ${formatTime(state.currentTime)} · CLIP ${formatTime(clipTime)} / ${formatTime(clipDuration)}`
+                : `SOURCE ${formatTime(state.currentTime)} · CLIP -- / ${formatTime(clipDuration)}`;
         }
 
         function updateSelectionUI() {
@@ -826,85 +940,139 @@
 
             DOM.infoIn.textContent = formatTime(state.selection.in);
             DOM.infoOut.textContent = formatTime(state.selection.out);
-            DOM.infoDur.textContent = formatTime(state.selection.out - state.selection.in);
+            const duration = state.selection.out - state.selection.in;
+            const fps = getActiveFps();
+            const frames = Math.max(1, Math.round(duration * fps));
+            DOM.infoDur.textContent = `${formatTime(duration)} · ${frames}f`;
+            const durationHint = document.getElementById('duration-drag-hint');
+            if (durationHint) durationHint.textContent = `Horizontal: move · Vertical: duration · Snap: 1/${fps} s`;
+            updatePlayheadUI();
+        }
+
+        function getActiveFps() {
+            const file = getActiveFile();
+            return Math.max(1, Number(file?.fps) || 30);
+        }
+
+        function snapTimeToFrame(time, fps = getActiveFps()) {
+            return Math.round(Math.max(0, time) * fps) / fps;
+        }
+
+        function snapDurationToFrame(duration, fps = getActiveFps()) {
+            const frames = Math.max(1, Math.round(Math.max(0, duration) * fps));
+            return frames / fps;
         }
 
         // --- Dragging Logic ---
         function startDrag(e, type) {
             e.preventDefault();
             const file = getActiveFile();
-            if(!file) return;
+            if (!file) return;
 
             state.isDragging = type;
             state.dragStartX = e.clientX;
-            
-            if(type === 'playhead') state.dragStartValue = state.currentTime;
-            else if(type === 'handle-left') state.dragStartValue = state.selection.in;
-            else if(type === 'handle-right') state.dragStartValue = state.selection.out;
-            else if(type === 'selection') state.dragStartValue = state.selection.in; // Base ref
-            
-            if(state.isPlaying) DOM.mainVideo.pause();
-            
+            state.dragStartY = e.clientY;
+            state.dragStartCurrentTime = state.currentTime;
+            state.dragStartIn = state.selection.in;
+            state.dragStartOut = state.selection.out;
+            state.dragAxis = null;
+
+            if (type === 'playhead') state.dragStartValue = state.currentTime;
+            else if (type === 'handle-left') state.dragStartValue = state.selection.in;
+            else if (type === 'handle-right') state.dragStartValue = state.selection.out;
+            else if (type === 'selection') state.dragStartValue = state.selection.in;
+
+            if (state.isPlaying) DOM.mainVideo.pause();
+
             document.body.classList.add('no-select', type === 'playhead' || type.startsWith('handle') ? 'cursor-ew-resize' : 'cursor-move');
         }
 
         function handleDrag(e) {
             if (!state.isDragging) return;
             const file = getActiveFile();
-            
+            if (!file) return;
+
             const dx = e.clientX - state.dragStartX;
+            const dy = e.clientY - state.dragStartY;
             const dt = dx / state.zoom;
-            
+
             if (state.isDragging === 'playhead') {
-                let t = state.dragStartValue + dt;
+                const fps = getActiveFps();
+                let t = snapTimeToFrame(state.dragStartValue + dt, fps);
                 t = Math.max(0, Math.min(t, file.duration));
                 state.currentTime = t;
                 DOM.mainVideo.currentTime = t;
                 updatePlayheadUI();
-                
-                // Auto scroll timeline if dragging near edges
                 autoScrollTimeline(e.clientX);
-            } 
-            else if (state.isDragging === 'handle-left') {
-                let t = state.dragStartValue + dt;
-                t = Math.max(0, Math.min(t, state.selection.out - 0.1)); // min 0.1s gap
+            } else if (state.isDragging === 'handle-left') {
+                const fps = getActiveFps();
+                let t = snapTimeToFrame(state.dragStartValue + dt, fps);
+                t = Math.max(0, Math.min(t, state.selection.out - (1 / fps)));
                 state.selection.in = t;
-                updateSelectionUI();
-                DOM.mainVideo.currentTime = t;
                 state.currentTime = t;
+                DOM.mainVideo.currentTime = t;
+                updateSelectionUI();
                 updatePlayheadUI();
-            }
-            else if (state.isDragging === 'handle-right') {
-                let t = state.dragStartValue + dt;
-                t = Math.max(state.selection.in + 0.1, Math.min(t, file.duration));
+            } else if (state.isDragging === 'handle-right') {
+                const fps = getActiveFps();
+                let t = snapTimeToFrame(state.dragStartValue + dt, fps);
+                t = Math.max(state.selection.in + (1 / fps), Math.min(t, file.duration));
                 state.selection.out = t;
-                updateSelectionUI();
-                DOM.mainVideo.currentTime = t;
                 state.currentTime = t;
-                updatePlayheadUI();
-            }
-            else if (state.isDragging === 'selection') {
-                const dur = state.selection.out - state.selection.in;
-                let tIn = state.dragStartValue + dt;
-
-                if (tIn < 0) tIn = 0;
-                if (tIn + dur > file.duration) tIn = file.duration - dur;
-
-                state.selection.in = tIn;
-                state.selection.out = tIn + dur;
+                DOM.mainVideo.currentTime = t;
                 updateSelectionUI();
-                DOM.mainVideo.currentTime = tIn;
-                state.currentTime = tIn;
                 updatePlayheadUI();
-                autoScrollTimeline(e.clientX);
+            } else if (state.isDragging === 'selection') {
+                const axisLockThreshold = 5;
+
+                if (!state.dragAxis && Math.max(Math.abs(dx), Math.abs(dy)) >= axisLockThreshold) {
+                    state.dragAxis = Math.abs(dy) > Math.abs(dx) ? 'duration' : 'move';
+                    document.body.classList.remove('cursor-move', 'cursor-ew-resize', 'cursor-ns-resize');
+                    document.body.classList.add(state.dragAxis === 'duration' ? 'cursor-ns-resize' : 'cursor-move');
+                }
+
+                if (state.dragAxis === 'duration') {
+                    const fps = getActiveFps();
+                    const startDuration = state.dragStartOut - state.dragStartIn;
+                    const rawDuration = startDuration - (dy / state.zoom);
+                    const maxDuration = Math.max(1 / fps, file.duration - state.dragStartIn);
+                    const duration = Math.min(maxDuration, snapDurationToFrame(rawDuration, fps));
+
+                    state.selection.in = state.dragStartIn;
+                    state.selection.out = Math.min(file.duration, state.selection.in + duration);
+
+                    updateSelectionUI();
+                } else if (state.dragAxis === 'move') {
+                    const fps = getActiveFps();
+                    const duration = snapDurationToFrame(state.dragStartOut - state.dragStartIn, fps);
+                    let tIn = snapTimeToFrame(state.dragStartIn + dt, fps);
+
+                    if (tIn < 0) tIn = 0;
+                    if (tIn + duration > file.duration) tIn = Math.max(0, snapTimeToFrame(file.duration - duration, fps));
+
+                    state.selection.in = tIn;
+                    state.selection.out = Math.min(file.duration, tIn + duration);
+
+                    updateSelectionUI();
+                    autoScrollTimeline(e.clientX);
+                }
             }
         }
 
-        function endDrag() {
-            if (state.isDragging) {
-                state.isDragging = null;
-                document.body.classList.remove('no-select', 'cursor-ew-resize', 'cursor-move');
-            }
+        function endDrag(e) {
+            if (!state.isDragging) return;
+
+            const dragType = state.isDragging;
+            const dragAxis = state.dragAxis;
+            const dx = e ? e.clientX - state.dragStartX : 0;
+            const dy = e ? e.clientY - state.dragStartY : 0;
+            const wasSelectionClick = dragType === 'selection' && !dragAxis && Math.max(Math.abs(dx), Math.abs(dy)) < 5;
+
+            state.isDragging = null;
+            state.dragAxis = null;
+            document.body.classList.remove('no-select', 'cursor-ew-resize', 'cursor-move', 'cursor-ns-resize');
+
+            if (wasSelectionClick && e) seekTimelineAtClientX(e.clientX);
         }
 
         function autoScrollTimeline(clientX) {
@@ -1301,121 +1469,505 @@
         }
 
         function updateExportBtn() {
-            DOM.exportBtn.disabled = state.clips.length === 0;
+            DOM.exportBtn.disabled = state.clips.length === 0 || state.exportEngine.active;
+            DOM.exportEngineSelect.disabled = state.exportEngine.active;
         }
 
-        // --- Export & MediaRecorder Logic ---
-        async function exportZIP() {
-            if(state.clips.length === 0) return;
+        function webCodecsExportAvailable() {
+            return typeof VideoEncoder === 'function' && typeof VideoDecoder === 'function';
+        }
 
+        function updateExportEngineUI() {
+            state.exportEngine.mode = DOM.exportEngineSelect.value;
+            DOM.exportLogLabel.textContent = state.exportEngine.mode === 'webcodecs' ? 'WebCodecs' : 'FFmpeg';
+        }
+
+        // --- Export: WebCodecs + FFmpeg.wasm single-thread fallback ---
+        const FFMPEG_CORE_BASE = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+        const FFMPEG_CORE_JS_URL = `${FFMPEG_CORE_BASE}/ffmpeg-core.js`;
+        const FFMPEG_CORE_WASM_URL = `${FFMPEG_CORE_BASE}/ffmpeg-core.wasm`;
+        const MEDIABUNNY_ESM_URL = "https://cdn.jsdelivr.net/npm/mediabunny@1.51.0/+esm";
+        let mediabunnyModulePromise = null;
+
+        async function loadMediabunny() {
+            if (!mediabunnyModulePromise) {
+                mediabunnyModulePromise = import(MEDIABUNNY_ESM_URL).catch(error => {
+                    mediabunnyModulePromise = null;
+                    throw error;
+                });
+            }
+
+            return mediabunnyModulePromise;
+        }
+
+        function setExportProgress(stage, message, completed, total) {
+            const safeTotal = Math.max(1, total || 1);
+            const safeCompleted = Math.max(0, Math.min(completed || 0, safeTotal));
+            const percent = Math.round((safeCompleted / safeTotal) * 100);
+
+            DOM.progressStage.textContent = stage;
+            DOM.progressText.textContent = message;
+            DOM.progressCount.textContent = `${completed || 0} / ${total || 0}`;
+            DOM.progressPercent.textContent = `${percent}%`;
+            DOM.progressBar.style.width = `${percent}%`;
+        }
+
+        function appendExportLog(message) {
+            DOM.exportLog.textContent += `${message}\n`;
+            DOM.exportLog.scrollTop = DOM.exportLog.scrollHeight;
+        }
+
+        function openExportModal() {
             DOM.progressOverlay.classList.remove('hidden');
-            const zip = new JSZip();
-            let csvContent = "video,prompt,input_audio,frame_rate\n";
+            DOM.progressOverlay.classList.add('flex');
+            DOM.exportCloseBtn.classList.add('hidden');
+            DOM.exportError.classList.add('hidden');
+            DOM.exportError.textContent = '';
+            DOM.exportLog.textContent = '';
+            DOM.exportLogLabel.textContent = state.exportEngine.mode === 'webcodecs' ? 'WebCodecs' : 'FFmpeg';
+            setExportProgress('Preparing', `Starting ${state.exportEngine.mode === 'webcodecs' ? 'WebCodecs' : 'FFmpeg'} export...`, 0, state.clips.length);
+        }
 
-            try {
-                for (let i = 0; i < state.clips.length; i++) {
-                    const clip = state.clips[i];
-                    DOM.progressText.textContent = `Recording clip ${i + 1} of ${state.clips.length}... (${clip.fileName})`;
-                    DOM.progressBar.style.width = `${((i) / state.clips.length) * 100}%`;
+        function closeExportModal() {
+            if (state.exportEngine.active) return;
+            DOM.progressOverlay.classList.add('hidden');
+            DOM.progressOverlay.classList.remove('flex');
+        }
 
-                    const fileInfo = state.files.find(f => f.id === clip.fileId);
-                    
-                    // Fallback to mp4 name but use webm if browser forces it
-                    let ext = 'webm';
-                    let mime = 'video/webm';
-                    if (MediaRecorder.isTypeSupported('video/mp4')) {
-                        ext = 'mp4';
-                        mime = 'video/mp4';
-                    }
+        function createFFmpegWorkerSource() {
+            return `
+                "use strict";
 
-                    const outFilename = `clip_${i+1}_${clip.fileName.split('.')[0]}.${ext}`;
-                    
-                    // Start Recording Process
-                    const blob = await recordClip(fileInfo.url, clip.inTime, clip.outTime, mime);
-                    zip.file(outFilename, blob);
+                const CORE_JS_URL = ${JSON.stringify(FFMPEG_CORE_JS_URL)};
+                const CORE_WASM_URL = ${JSON.stringify(FFMPEG_CORE_WASM_URL)};
+                let core = null;
 
-                    // Add to CSV
-                    // CSV spec: video,prompt,input_audio,frame_rate
-                    // Note: prompt needs to be escaped if contains quotes/commas
-                    const safeCaption = `"${clip.caption.replace(/"/g, '""')}"`;
-                    csvContent += `${outFilename},${safeCaption},${outFilename},${fileInfo.fps}\n`;
+                function send(id, ok, data, error, transfer = []) {
+                    self.postMessage({ id, ok, data, error }, transfer);
                 }
 
-                DOM.progressText.textContent = `Packaging ZIP file...`;
-                DOM.progressBar.style.width = `100%`;
+                async function loadCore() {
+                    if (core) return;
 
-                zip.file("metadata.csv", csvContent);
-                
-                const zipBlob = await zip.generateAsync({ type: "blob" });
-                saveAs(zipBlob, "clips_export.zip");
+                    importScripts(CORE_JS_URL);
 
-            } catch (err) {
-                console.error("Export failed:", err);
-                alert("An error occurred during export. See console for details.");
+                    if (typeof createFFmpegCore !== "function") {
+                        throw new Error("createFFmpegCore was not exposed by ffmpeg-core.js");
+                    }
+
+                    const locationConfig = btoa(JSON.stringify({
+                        wasmURL: CORE_WASM_URL,
+                        workerURL: ""
+                    }));
+
+                    core = await createFFmpegCore({
+                        mainScriptUrlOrBlob: "blob:clipcaptioner#" + locationConfig
+                    });
+
+                    core.setLogger(({ type, message }) => {
+                        self.postMessage({ type: "log", data: { type, message } });
+                    });
+
+                    core.setProgress(({ progress, time }) => {
+                        self.postMessage({ type: "progress", data: { progress, time } });
+                    });
+                }
+
+                self.onmessage = async event => {
+                    const { id, action, payload } = event.data;
+
+                    try {
+                        if (action === "load") {
+                            await loadCore();
+                            send(id, true, true);
+                            return;
+                        }
+
+                        if (!core) throw new Error("FFmpeg core is not loaded.");
+
+                        if (action === "writeFile") {
+                            core.FS.writeFile(payload.name, new Uint8Array(payload.buffer));
+                            send(id, true, true);
+                            return;
+                        }
+
+                        if (action === "exec") {
+                            core.reset();
+                            const exitCode = core.exec(...payload.args);
+                            send(id, true, exitCode);
+                            return;
+                        }
+
+                        if (action === "readFile") {
+                            const file = core.FS.readFile(payload.name);
+                            const copy = new Uint8Array(file.byteLength);
+                            copy.set(file);
+                            send(id, true, copy.buffer, null, [copy.buffer]);
+                            return;
+                        }
+
+                        if (action === "deleteFile") {
+                            try {
+                                core.FS.unlink(payload.name);
+                            } catch (error) {
+                                if (!String(error).includes("FS error")) throw error;
+                            }
+                            send(id, true, true);
+                            return;
+                        }
+
+                        throw new Error("Unknown FFmpeg worker action: " + action);
+                    } catch (error) {
+                        send(id, false, null, error?.stack || error?.message || String(error));
+                    }
+                };
+            `;
+        }
+
+        function callFFmpegWorker(action, payload = {}, transfer = []) {
+            const worker = state.exportEngine.worker;
+            if (!worker) return Promise.reject(new Error("FFmpeg worker is not available."));
+
+            const id = ++state.exportEngine.requestId;
+
+            return new Promise((resolve, reject) => {
+                state.exportEngine.pending.set(id, { resolve, reject });
+                worker.postMessage({ id, action, payload }, transfer);
+            });
+        }
+
+        async function loadFFmpegSingleThread() {
+            if (state.exportEngine.worker) return state.exportEngine.worker;
+            if (state.exportEngine.loading) return state.exportEngine.loading;
+
+            state.exportEngine.loading = (async () => {
+                setExportProgress('Loading FFmpeg', 'Loading single-thread core...', 0, state.clips.length);
+                appendExportLog('FFmpeg mode: single-thread @ffmpeg/core');
+                appendExportLog('SharedArrayBuffer required: no');
+
+                const workerSource = createFFmpegWorkerSource();
+                const workerURL = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+                const worker = new Worker(workerURL);
+                URL.revokeObjectURL(workerURL);
+
+                worker.onmessage = event => {
+                    const message = event.data;
+
+                    if (message.type === 'log') {
+                        appendExportLog(message.data?.message || '');
+                        return;
+                    }
+
+                    if (message.type === 'progress') return;
+
+                    const pending = state.exportEngine.pending.get(message.id);
+                    if (!pending) return;
+
+                    state.exportEngine.pending.delete(message.id);
+
+                    if (message.ok) pending.resolve(message.data);
+                    else pending.reject(new Error(message.error || 'FFmpeg worker failed.'));
+                };
+
+                worker.onerror = event => {
+                    const error = new Error(event.message || 'FFmpeg worker crashed.');
+                    for (const pending of state.exportEngine.pending.values()) pending.reject(error);
+                    state.exportEngine.pending.clear();
+                };
+
+                state.exportEngine.worker = worker;
+
+                try {
+                    await callFFmpegWorker('load');
+                    appendExportLog('FFmpeg single-thread core ready.');
+                    return worker;
+                } catch (error) {
+                    worker.terminate();
+                    state.exportEngine.worker = null;
+                    throw error;
+                }
+            })();
+
+            try {
+                return await state.exportEngine.loading;
             } finally {
-                DOM.progressOverlay.classList.add('hidden');
+                state.exportEngine.loading = null;
             }
         }
 
-        function recordClip(videoUrl, inTime, outTime, mimeType) {
-            return new Promise((resolve, reject) => {
-                const video = document.createElement('video');
-                video.src = videoUrl;
-                video.crossOrigin = 'anonymous';
-                video.muted = false; // Need audio
-                // Force video display hidden but active in DOM slightly helps captureStream
-                video.style.display = 'none';
-                document.body.appendChild(video);
+        function sanitizeExportName(name) {
+            return String(name || 'video').replace(/[^\w.-]+/g, '_');
+        }
 
-                let recorder;
-                const chunks = [];
+        function getInputExtension(name) {
+            const match = String(name || '').match(/\.([a-zA-Z0-9]+)$/);
+            return match ? match[1].toLowerCase() : 'mp4';
+        }
 
-                video.onloadeddata = () => {
-                    video.currentTime = inTime;
-                };
+        async function cutClipWithFFmpeg(inputName, outputName, clip) {
+            const start = Math.max(0, clip.inTime);
+            const duration = Math.max(0.001, clip.outTime - clip.inTime);
 
-                video.onseeked = () => {
-                    if (video.currentTime >= outTime) return; // safety
-                    
-                    try {
-                        const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
-                        recorder = new MediaRecorder(stream, { mimeType });
-                        
-                        recorder.ondataavailable = e => {
-                            if (e.data.size > 0) chunks.push(e.data);
-                        };
-                        
-                        recorder.onstop = () => {
-                            const blob = new Blob(chunks, { type: mimeType });
-                            document.body.removeChild(video);
-                            resolve(blob);
-                        };
-
-                        recorder.start();
-                        video.play().catch(reject);
-
-                    } catch (e) {
-                        document.body.removeChild(video);
-                        reject(e);
-                    }
-                };
-
-                video.ontimeupdate = () => {
-                    if (video.currentTime >= outTime && recorder && recorder.state === 'recording') {
-                        recorder.stop();
-                        video.pause();
-                    }
-                };
-
-                video.onerror = (e) => {
-                    document.body.removeChild(video);
-                    reject(e);
-                };
+            const exitCode = await callFFmpegWorker('exec', {
+                args: [
+                    '-ss', start.toFixed(6),
+                    '-i', inputName,
+                    '-t', duration.toFixed(6),
+                    '-map', '0:v:0',
+                    '-map', '0:a?',
+                    '-c:v', 'libx264',
+                    '-preset', 'veryfast',
+                    '-crf', '18',
+                    '-pix_fmt', 'yuv420p',
+                    '-c:a', 'aac',
+                    '-b:a', '192k',
+                    '-movflags', '+faststart',
+                    '-avoid_negative_ts', 'make_zero',
+                    '-reset_timestamps', '1',
+                    outputName
+                ]
             });
+
+            if (exitCode !== 0) throw new Error(`FFmpeg exited with code ${exitCode} while creating ${outputName}.`);
+        }
+
+        async function encodeClipWithWebCodecs(fileInfo, clip, onProgress) {
+            if (!webCodecsExportAvailable()) throw new Error("WebCodecs video encode/decode is not available in this browser.");
+
+            const {
+                Input,
+                BlobSource,
+                ALL_FORMATS,
+                Output,
+                Mp4OutputFormat,
+                BufferTarget,
+                Conversion,
+                QUALITY_HIGH
+            } = await loadMediabunny();
+
+            const input = new Input({
+                source: new BlobSource(fileInfo.file),
+                formats: ALL_FORMATS
+            });
+
+            const target = new BufferTarget();
+            const output = new Output({
+                format: new Mp4OutputFormat(),
+                target
+            });
+
+            const conversion = await Conversion.init({
+                input,
+                output,
+                tracks: 'primary',
+                trim: {
+                    start: clip.inTime,
+                    end: clip.outTime
+                },
+                video: {
+                    codec: 'avc',
+                    bitrate: QUALITY_HIGH,
+                    hardwareAcceleration: 'prefer-hardware',
+                    forceTranscode: true
+                },
+                audio: {
+                    codec: 'aac'
+                },
+                showWarnings: false
+            });
+
+            if (!conversion.isValid) {
+                const details = conversion.discardedTracks.map(item => {
+                    const reason = item.reason ?? item.discardReason ?? 'unsupported track';
+                    return String(reason);
+                }).join(', ');
+                throw new Error(`WebCodecs conversion is not valid${details ? `: ${details}` : '.'}`);
+            }
+
+            conversion.onProgress = progress => {
+                if (Number.isFinite(progress)) onProgress(Math.max(0, Math.min(1, progress)));
+            };
+
+            await conversion.execute();
+
+            if (!target.buffer) throw new Error("WebCodecs conversion produced no output buffer.");
+            return new Blob([target.buffer], { type: 'video/mp4' });
+        }
+
+        async function exportZIPWithWebCodecs() {
+            if (state.clips.length === 0 || state.exportEngine.active) return;
+
+            state.exportEngine.active = true;
+            updateExportBtn();
+            openExportModal();
+
+            try {
+                if (!webCodecsExportAvailable()) throw new Error("WebCodecs export is unavailable. Switch Engine to FFmpeg (WASM).");
+
+                const zip = new JSZip();
+                let csvContent = "video,prompt,input_audio,frame_rate\n";
+
+                appendExportLog('Engine: WebCodecs');
+                appendExportLog(`VideoEncoder: ${typeof VideoEncoder === 'function' ? 'available' : 'missing'}`);
+                appendExportLog(`VideoDecoder: ${typeof VideoDecoder === 'function' ? 'available' : 'missing'}`);
+                appendExportLog('Mediabunny: lazy ESM load');
+                appendExportLog('Video codec: H.264 / AVC');
+                appendExportLog('Hardware acceleration: prefer-hardware');
+                appendExportLog('Container: MP4');
+
+                for (let i = 0; i < state.clips.length; i += 1) {
+                    const clip = state.clips[i];
+                    const fileInfo = state.files.find(file => file.id === clip.fileId);
+                    if (!fileInfo) throw new Error(`Source file not found for fileId: ${clip.fileId}`);
+
+                    const outputName = `clip_${(i + 1).toString().padStart(3, '0')}.mp4`;
+                    const rangeText = `${formatTime(clip.inTime)} → ${formatTime(clip.outTime)}`;
+
+                    setExportProgress('Encoding clip', `${outputName} · ${rangeText}`, i, state.clips.length);
+                    appendExportLog(`Encode ${outputName}: ${clip.inTime.toFixed(3)}s -> ${clip.outTime.toFixed(3)}s`);
+
+                    const blob = await encodeClipWithWebCodecs(fileInfo, clip, progress => {
+                        const overall = ((i + progress) / state.clips.length) * 100;
+                        DOM.progressBar.style.width = `${overall}%`;
+                        DOM.progressPercent.textContent = `${Math.round(overall)}%`;
+                        DOM.progressText.textContent = `${outputName} · ${Math.round(progress * 100)}%`;
+                        DOM.progressCount.textContent = `${i} / ${state.clips.length}`;
+                    });
+
+                    zip.file(outputName, blob);
+
+                    const caption = clip.caption.replace(/"/g, '""');
+                    csvContent += `${outputName},"${caption}",${outputName},${fileInfo.fps}\n`;
+
+                    setExportProgress('Encoding clip', `${outputName} complete`, i + 1, state.clips.length);
+                    appendExportLog(`${outputName}: ${(blob.size / 1024 / 1024).toFixed(2)} MiB`);
+                }
+
+                setExportProgress('Packaging ZIP', 'Writing metadata.csv and ZIP archive...', state.clips.length, state.clips.length);
+                zip.file('metadata.csv', csvContent);
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' }, metadata => {
+                    DOM.progressStage.textContent = 'Packaging ZIP';
+                    DOM.progressText.textContent = `Compressing archive... ${Math.round(metadata.percent)}%`;
+                });
+
+                saveAs(zipBlob, 'clips_export.zip');
+
+                DOM.progressStage.textContent = 'Complete';
+                DOM.progressText.textContent = `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} exported with WebCodecs`;
+                DOM.progressCount.textContent = `${state.clips.length} / ${state.clips.length}`;
+                DOM.progressPercent.textContent = '100%';
+                DOM.progressBar.style.width = '100%';
+                DOM.exportCloseBtn.classList.remove('hidden');
+            } catch (error) {
+                console.error('WebCodecs export failed', error);
+                DOM.progressStage.textContent = 'Export failed';
+                DOM.exportError.textContent = error?.stack || error?.message || String(error);
+                DOM.exportError.classList.remove('hidden');
+                DOM.exportCloseBtn.classList.remove('hidden');
+            } finally {
+                state.exportEngine.active = false;
+                updateExportBtn();
+            }
+        }
+
+        async function exportZIP() {
+            if (state.exportEngine.mode === 'webcodecs') {
+                await exportZIPWithWebCodecs();
+                return;
+            }
+
+            await exportZIPWithFFmpeg();
+        }
+
+        async function exportZIPWithFFmpeg() {
+            if (state.clips.length === 0 || state.exportEngine.active) return;
+
+            state.exportEngine.active = true;
+            DOM.exportBtn.disabled = true;
+            openExportModal();
+
+            try {
+                appendExportLog('Engine: FFmpeg single-thread WASM');
+                await loadFFmpegSingleThread();
+
+                const zip = new JSZip();
+                let csvContent = "video,prompt,input_audio,frame_rate\n";
+                let completed = 0;
+                const clipsByFile = new Map();
+
+                for (const clip of state.clips) {
+                    if (!clipsByFile.has(clip.fileId)) clipsByFile.set(clip.fileId, []);
+                    clipsByFile.get(clip.fileId).push(clip);
+                }
+
+                for (const [fileId, clips] of clipsByFile) {
+                    const fileInfo = state.files.find(file => file.id === fileId);
+                    if (!fileInfo) throw new Error(`Source file not found for fileId: ${fileId}`);
+
+                    const inputName = `input_${sanitizeExportName(fileInfo.id)}.${getInputExtension(fileInfo.name)}`;
+                    const inputBuffer = await fileInfo.file.arrayBuffer();
+
+                    setExportProgress('Reading source', fileInfo.name, completed, state.clips.length);
+                    appendExportLog(`Loading source: ${fileInfo.name}`);
+                    await callFFmpegWorker('writeFile', { name: inputName, buffer: inputBuffer }, [inputBuffer]);
+
+                    try {
+                        for (const clip of clips) {
+                            const globalIndex = state.clips.indexOf(clip) + 1;
+                            const outputName = `clip_${globalIndex.toString().padStart(3, '0')}.mp4`;
+
+                            setExportProgress('Encoding clip', `${outputName} · ${formatTime(clip.inTime)} → ${formatTime(clip.outTime)}`, completed, state.clips.length);
+                            appendExportLog(`Cut ${outputName}: ${clip.inTime.toFixed(3)}s -> ${clip.outTime.toFixed(3)}s`);
+
+                            await cutClipWithFFmpeg(inputName, outputName, clip);
+
+                            const outputBuffer = await callFFmpegWorker('readFile', { name: outputName });
+                            zip.file(outputName, new Blob([outputBuffer], { type: 'video/mp4' }));
+
+                            const caption = clip.caption.replace(/"/g, '""');
+                            csvContent += `${outputName},"${caption}",${outputName},${fileInfo.fps}\n`;
+
+                            await callFFmpegWorker('deleteFile', { name: outputName });
+                            completed += 1;
+                            setExportProgress('Encoding clip', `${outputName} complete`, completed, state.clips.length);
+                        }
+                    } finally {
+                        await callFFmpegWorker('deleteFile', { name: inputName });
+                    }
+                }
+
+                setExportProgress('Packaging ZIP', 'Writing metadata.csv and ZIP archive...', state.clips.length, state.clips.length);
+                zip.file('metadata.csv', csvContent);
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' }, metadata => {
+                    DOM.progressStage.textContent = 'Packaging ZIP';
+                    DOM.progressText.textContent = `Compressing archive... ${Math.round(metadata.percent)}%`;
+                });
+
+                saveAs(zipBlob, 'clips_export.zip');
+
+                DOM.progressStage.textContent = 'Complete';
+                DOM.progressText.textContent = `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} exported`;
+                DOM.progressCount.textContent = `${state.clips.length} / ${state.clips.length}`;
+                DOM.progressPercent.textContent = '100%';
+                DOM.progressBar.style.width = '100%';
+                DOM.exportCloseBtn.classList.remove('hidden');
+            } catch (error) {
+                console.error('Export failed', error);
+                DOM.progressStage.textContent = 'Export failed';
+                DOM.exportError.textContent = error?.stack || error?.message || String(error);
+                DOM.exportError.classList.remove('hidden');
+                DOM.exportCloseBtn.classList.remove('hidden');
+            } finally {
+                state.exportEngine.active = false;
+                updateExportBtn();
+            }
         }
 
         // Initialize App
         initEvents();
+        updateExportEngineUI();
 
     </script>
 </body>
