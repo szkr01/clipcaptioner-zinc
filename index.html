@@ -302,51 +302,134 @@
     <video id="thumb-video" class="hidden" muted playsinline></video>
 
     <!-- AI Settings Modal -->
-    <div id="ai-settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-        <div class="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
-            <div class="h-14 px-5 border-b border-zinc-800 flex items-center justify-between">
+    <div id="ai-settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
+        <div class="w-[min(1120px,calc(100vw-48px))] h-[min(760px,calc(100vh-48px))] min-h-[560px] bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="h-14 px-5 border-b border-zinc-800 flex items-center justify-between shrink-0">
                 <div>
                     <h3 class="text-sm font-semibold text-zinc-100">AI Settings</h3>
                     <p class="text-[11px] text-zinc-500 mt-0.5">WD EVA02 tag selection</p>
                 </div>
-                <button id="ai-settings-close-btn" class="w-8 h-8 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors flex items-center justify-center" aria-label="Close AI settings">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"></path></svg>
+                <button id="ai-settings-close-btn" class="w-9 h-9 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors flex items-center justify-center" aria-label="Close AI settings">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"></path></svg>
                 </button>
             </div>
 
-            <div class="p-5 space-y-6">
-                <section class="space-y-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="text-xs font-semibold text-zinc-200">General threshold</div>
-                            <div class="text-[11px] text-zinc-500 mt-0.5">General tags below this confidence are removed.</div>
-                        </div>
-                        <span id="ai-general-threshold-value" class="font-mono text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 px-2 py-1 rounded-md">0.35</span>
-                    </div>
-                    <input id="ai-general-threshold" type="range" min="0" max="1" step="0.01" value="0.35" class="w-full">
+            <div class="flex flex-1 min-h-0">
+                <aside class="w-56 shrink-0 border-r border-zinc-800 bg-zinc-950/45 p-3">
+                    <nav class="space-y-1">
+                        <button type="button" data-ai-settings-page="general" class="ai-settings-nav w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors bg-zinc-800 text-zinc-100">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"></path></svg>
+                            <span>Thresholds</span>
+                        </button>
+                        <button type="button" data-ai-settings-page="filter" class="ai-settings-nav w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M7 12h10M10 19h4"></path></svg>
+                            <span>Tag groups</span>
+                        </button>
+                        <button type="button" data-ai-settings-page="blacklist" class="ai-settings-nav w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path stroke-linecap="round" d="M6 6l12 12"></path></svg>
+                            <span>Blacklist</span>
+                        </button>
+                    </nav>
+                </aside>
 
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="text-xs font-semibold text-zinc-200">Character threshold</div>
-                            <div class="text-[11px] text-zinc-500 mt-0.5">Character tags below this confidence are removed.</div>
-                        </div>
-                        <span id="ai-character-threshold-value" class="font-mono text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 px-2 py-1 rounded-md">0.85</span>
-                    </div>
-                    <input id="ai-character-threshold" type="range" min="0" max="1" step="0.01" value="0.85" class="w-full">
-                </section>
+                <div class="flex-1 min-w-0 flex flex-col bg-zinc-900">
+                    <div class="flex-1 min-h-0 overflow-y-auto p-7">
+                        <section id="ai-settings-page-general" data-ai-settings-panel="general" class="max-w-3xl">
+                            <div class="mb-7">
+                                <h4 class="text-xl font-semibold text-zinc-100">Thresholds</h4>
+                                <p class="text-sm text-zinc-500 mt-1">Control how confident EVA02 must be before a tag is included.</p>
+                            </div>
 
-                <section>
-                    <div class="mb-2">
-                        <div class="text-xs font-semibold text-zinc-200">Tag blacklist</div>
-                        <div class="text-[11px] text-zinc-500 mt-0.5">One tag per line or comma-separated. Matching tags are excluded from the caption.</div>
-                    </div>
-                    <textarea id="ai-tag-blacklist" class="w-full h-36 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 resize-none font-mono" placeholder="1girl&#10;looking at viewer&#10;simple background"></textarea>
-                </section>
-            </div>
+                            <div class="space-y-7">
+                                <div class="rounded-xl border border-zinc-800 bg-zinc-950/45 p-5">
+                                    <div class="flex items-center justify-between gap-5 mb-4">
+                                        <div>
+                                            <div class="text-sm font-medium text-zinc-200">General threshold</div>
+                                            <div class="text-xs text-zinc-500 mt-1">General tags below this confidence are removed.</div>
+                                        </div>
+                                        <span id="ai-general-threshold-value" class="font-mono text-sm text-zinc-300 bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded-md">0.35</span>
+                                    </div>
+                                    <input id="ai-general-threshold" type="range" min="0" max="1" step="0.01" value="0.35" class="w-full">
+                                </div>
 
-            <div class="px-5 py-4 border-t border-zinc-800 bg-zinc-950/40 flex items-center justify-end gap-2">
-                <button id="ai-settings-cancel-btn" class="px-4 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Cancel</button>
-                <button id="ai-settings-save-btn" class="px-4 py-2 rounded-lg text-sm font-semibold bg-zinc-100 hover:bg-white text-zinc-950 transition-colors">Save</button>
+                                <div class="rounded-xl border border-zinc-800 bg-zinc-950/45 p-5">
+                                    <div class="flex items-center justify-between gap-5 mb-4">
+                                        <div>
+                                            <div class="text-sm font-medium text-zinc-200">Character threshold</div>
+                                            <div class="text-xs text-zinc-500 mt-1">Character tags below this confidence are removed.</div>
+                                        </div>
+                                        <span id="ai-character-threshold-value" class="font-mono text-sm text-zinc-300 bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded-md">0.85</span>
+                                    </div>
+                                    <input id="ai-character-threshold" type="range" min="0" max="1" step="0.01" value="0.85" class="w-full">
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="ai-settings-page-filter" data-ai-settings-panel="filter" class="hidden">
+                            <div class="mb-6">
+                                <h4 class="text-xl font-semibold text-zinc-100">Tag groups</h4>
+                                <p class="text-sm text-zinc-500 mt-1">Choose groups using the hierarchy from Danbooru Tag Groups. Available groups are loaded automatically.</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mb-5">
+                                <div class="rounded-xl border border-zinc-800 bg-zinc-950/45 p-4 flex items-center justify-between gap-4">
+                                    <div>
+                                        <div class="text-sm font-medium text-zinc-200">Group filter</div>
+                                        <div class="text-xs text-zinc-500 mt-1">Only keep tags from selected groups.</div>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                        <input id="ai-group-filter-enabled" type="checkbox" class="sr-only peer" checked>
+                                        <div class="w-9 h-5 bg-zinc-700 rounded-full peer peer-checked:bg-zinc-200 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-zinc-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 peer-checked:after:bg-zinc-950"></div>
+                                    </label>
+                                </div>
+
+                                <label id="ai-keep-ungrouped-row" class="rounded-xl border border-zinc-800 bg-zinc-950/45 p-4 flex items-start gap-3 cursor-pointer">
+                                    <input id="ai-keep-ungrouped-tags" type="checkbox" class="mt-0.5 w-4 h-4 accent-zinc-200" checked>
+                                    <span>
+                                        <span class="block text-sm font-medium text-zinc-200">Keep ungrouped tags</span>
+                                        <span class="block text-xs text-zinc-500 mt-1">Keeps tags such as 1girl when the group index has no entry.</span>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div id="ai-filter-groups-panel" class="rounded-xl border border-zinc-800 bg-zinc-950/45 overflow-hidden">
+                                <div class="p-4 border-b border-zinc-800 flex items-center gap-3">
+                                    <div class="relative flex-1">
+                                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" d="M20 20l-4-4"></path></svg>
+                                        <input id="ai-filter-group-search" type="search" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-9 pr-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600" placeholder="Search groups">
+                                    </div>
+                                    <button id="ai-filter-groups-default-btn" type="button" class="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">Default</button>
+                                    <button id="ai-filter-groups-all-btn" type="button" class="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">All</button>
+                                    <button id="ai-filter-groups-none-btn" type="button" class="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">None</button>
+                                </div>
+                                <div class="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+                                    <span>Danbooru Tag Groups hierarchy · checking a heading or group toggles its descendants</span>
+                                    <span id="ai-filter-group-count">Loading…</span>
+                                </div>
+                                <div id="ai-filter-groups-list" class="h-[330px] overflow-y-auto p-2">
+                                    <div class="text-sm text-zinc-500 p-3">Loading tag groups…</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="ai-settings-page-blacklist" data-ai-settings-panel="blacklist" class="hidden max-w-3xl">
+                            <div class="mb-7">
+                                <h4 class="text-xl font-semibold text-zinc-100">Blacklist</h4>
+                                <p class="text-sm text-zinc-500 mt-1">Tags entered here are always excluded from the generated caption.</p>
+                            </div>
+                            <div class="rounded-xl border border-zinc-800 bg-zinc-950/45 p-5">
+                                <div class="text-sm font-medium text-zinc-200 mb-1">Tag blacklist</div>
+                                <div class="text-xs text-zinc-500 mb-3">One tag per line or comma-separated.</div>
+                                <textarea id="ai-tag-blacklist" class="w-full h-72 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 resize-none font-mono" placeholder="looking at viewer&#10;simple background"></textarea>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="px-6 py-4 border-t border-zinc-800 bg-zinc-950/40 flex items-center justify-end gap-2 shrink-0">
+                        <button id="ai-settings-cancel-btn" class="px-4 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Cancel</button>
+                        <button id="ai-settings-save-btn" class="px-4 py-2 rounded-lg text-sm font-semibold bg-zinc-100 hover:bg-white text-zinc-950 transition-colors">Save</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -418,8 +501,13 @@
             aiSettings: {
                 generalThreshold: 0.35,
                 characterThreshold: 0.85,
+                groupFilterEnabled: true,
+                keepUngroupedTags: true,
+                filterGroups: null,
                 blacklist: new Set()
             },
+            aiSettingsDraftGroups: new Set(),
+            aiSettingsExpandedGroups: new Set(),
             exportEngine: {
                 mode: 'webcodecs',
                 worker: null,
@@ -454,6 +542,18 @@
             aiGeneralThresholdValue: document.getElementById('ai-general-threshold-value'),
             aiCharacterThreshold: document.getElementById('ai-character-threshold'),
             aiCharacterThresholdValue: document.getElementById('ai-character-threshold-value'),
+            aiGroupFilterEnabled: document.getElementById('ai-group-filter-enabled'),
+            aiKeepUngroupedTags: document.getElementById('ai-keep-ungrouped-tags'),
+            aiKeepUngroupedRow: document.getElementById('ai-keep-ungrouped-row'),
+            aiFilterGroupsPanel: document.getElementById('ai-filter-groups-panel'),
+            aiFilterGroupSearch: document.getElementById('ai-filter-group-search'),
+            aiFilterGroupsDefaultBtn: document.getElementById('ai-filter-groups-default-btn'),
+            aiFilterGroupsAllBtn: document.getElementById('ai-filter-groups-all-btn'),
+            aiFilterGroupsNoneBtn: document.getElementById('ai-filter-groups-none-btn'),
+            aiFilterGroupCount: document.getElementById('ai-filter-group-count'),
+            aiFilterGroupsList: document.getElementById('ai-filter-groups-list'),
+            aiSettingsNav: Array.from(document.querySelectorAll('[data-ai-settings-page]')),
+            aiSettingsPanels: Array.from(document.querySelectorAll('[data-ai-settings-panel]')),
             aiTagBlacklist: document.getElementById('ai-tag-blacklist'),
             
             infoIn: document.getElementById('info-in'),
@@ -616,6 +716,12 @@
             DOM.aiSettingsSaveBtn.addEventListener('click', saveAISettings);
             DOM.aiGeneralThreshold.addEventListener('input', () => DOM.aiGeneralThresholdValue.textContent = Number(DOM.aiGeneralThreshold.value).toFixed(2));
             DOM.aiCharacterThreshold.addEventListener('input', () => DOM.aiCharacterThresholdValue.textContent = Number(DOM.aiCharacterThreshold.value).toFixed(2));
+            DOM.aiGroupFilterEnabled.addEventListener('change', updateAIGroupFilterUI);
+            DOM.aiFilterGroupSearch.addEventListener('input', renderAIGroupList);
+            DOM.aiFilterGroupsDefaultBtn.addEventListener('click', () => setAIGroupSelection(KEEP_TAG_GROUPS));
+            DOM.aiFilterGroupsAllBtn.addEventListener('click', () => setAIGroupSelection(new Set(getAvailableFilterGroups())));
+            DOM.aiFilterGroupsNoneBtn.addEventListener('click', () => setAIGroupSelection(new Set()));
+            for (const nav of DOM.aiSettingsNav) nav.addEventListener('click', () => switchAISettingsPage(nav.dataset.aiSettingsPage));
             DOM.aiSettingsModal.addEventListener('mousedown', (e) => {
                 if (e.target === DOM.aiSettingsModal) closeAISettings();
             });
@@ -628,14 +734,440 @@
             return new Set(String(value || "").split(/[\n,]+/).map(tag => tag.trim().replaceAll(" ", "_").toLowerCase()).filter(Boolean));
         }
 
-        function openAISettings() {
+        function getFilterGroups() {
+            return state.aiSettings.filterGroups || KEEP_TAG_GROUPS;
+        }
+
+        function switchAISettingsPage(page) {
+            for (const panel of DOM.aiSettingsPanels) panel.classList.toggle('hidden', panel.dataset.aiSettingsPanel !== page);
+            for (const nav of DOM.aiSettingsNav) {
+                const active = nav.dataset.aiSettingsPage === page;
+                nav.classList.toggle('bg-zinc-800', active);
+                nav.classList.toggle('text-zinc-100', active);
+                nav.classList.toggle('text-zinc-400', !active);
+            }
+        }
+
+        function formatFilterGroupName(group) {
+            return String(group || '').replace(/^tag_group:/, '').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        function getAvailableFilterGroups() {
+            const index = state.captionEngine.index;
+            if (!index) return [];
+            const groups = new Set();
+            for (const [group, parents] of Object.entries(index.group_parents || {})) {
+                if (group.startsWith('tag_group:')) groups.add(group);
+                for (const parent of parents || []) {
+                    if (String(parent).startsWith('tag_group:')) groups.add(String(parent));
+                }
+            }
+            for (const memberships of Object.values(index.tags || {})) {
+                for (const membership of memberships || []) {
+                    const group = String(membership.page || '');
+                    if (group.startsWith('tag_group:')) groups.add(group);
+                }
+            }
+            return Array.from(groups).sort((a, b) => formatFilterGroupName(a).localeCompare(formatFilterGroupName(b)));
+        }
+
+        const DANBOORU_GROUP_LAYOUT = [
+            {
+                label: 'Visual characteristics',
+                children: [
+                    {
+                        label: 'Image composition and style',
+                        children: [
+                            { group: 'tag_group:artistic_license' },
+                            {
+                                group: 'tag_group:image_composition',
+                                children: [
+                                    { group: 'tag_group:backgrounds' },
+                                    { group: 'tag_group:censorship' },
+                                    { group: 'tag_group:colors' },
+                                    { group: 'tag_group:focus_tags' },
+                                    { group: 'tag_group:lighting' },
+                                    { group: 'tag_group:prints' },
+                                    { group: 'tag_group:visual_aesthetic' }
+                                ]
+                            },
+                            { group: 'tag_group:patterns' },
+                            { group: 'tag_group:symbols' },
+                            { group: 'tag_group:text', children: [{ group: 'tag_group:japanese_dialects' }] },
+                            { group: 'tag_group:year_tags' }
+                        ]
+                    },
+                    {
+                        label: 'Body',
+                        children: [
+                            {
+                                group: 'tag_group:body_parts',
+                                children: [
+                                    { group: 'tag_group:ass' },
+                                    { group: 'tag_group:breasts_tags' },
+                                    { group: 'tag_group:face_tags', children: [{ group: 'tag_group:ears_tags' }, { group: 'tag_group:eyes_tags' }] },
+                                    { group: 'tag_group:hair', children: [{ group: 'tag_group:hair_color' }, { group: 'tag_group:hair_styles' }] },
+                                    { group: 'tag_group:hands', children: [{ group: 'tag_group:gestures' }] },
+                                    { group: 'tag_group:feet' },
+                                    { group: 'tag_group:neck_and_neckwear' },
+                                    { group: 'tag_group:posture' },
+                                    { group: 'tag_group:pussy' },
+                                    { group: 'tag_group:shoulders' },
+                                    { group: 'tag_group:skin_color' },
+                                    { group: 'tag_group:wings' }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        label: 'Attire and body accessories',
+                        children: [
+                            { group: 'tag_group:accessories' },
+                            {
+                                group: 'tag_group:attire',
+                                children: [
+                                    { group: 'tag_group:handwear' },
+                                    { group: 'tag_group:headwear' },
+                                    { group: 'tag_group:legwear' },
+                                    { group: 'tag_group:neck_and_neckwear' },
+                                    { group: 'tag_group:sexual_attire' },
+                                    { group: 'tag_group:sleeves' }
+                                ]
+                            },
+                            { group: 'tag_group:embellishment' },
+                            { group: 'tag_group:eyewear' },
+                            { group: 'tag_group:fashion_style' },
+                            { group: 'tag_group:makeup' },
+                            { group: 'tag_group:covering' },
+                            { group: 'tag_group:nudity' }
+                        ]
+                    },
+                    {
+                        label: 'Sex',
+                        children: [
+                            { group: 'tag_group:sex_acts', children: [{ group: 'tag_group:simulated_sex_acts' }] },
+                            { group: 'tag_group:sexual_positions' }
+                        ]
+                    },
+                    {
+                        label: 'Objects',
+                        children: [
+                            { group: 'tag_group:audio_tags' },
+                            { group: 'tag_group:cards' },
+                            { group: 'tag_group:doors_and_gates' },
+                            { group: 'tag_group:eyewear' },
+                            { group: 'tag_group:piercings' },
+                            { group: 'tag_group:sex_objects' }
+                        ]
+                    },
+                    {
+                        label: 'Creatures',
+                        children: [
+                            { group: 'tag_group:birds' },
+                            { group: 'tag_group:cats' },
+                            { group: 'tag_group:dogs' },
+                            { group: 'tag_group:legendary_creatures' }
+                        ]
+                    },
+                    { label: 'Plants', children: [{ group: 'tag_group:flowers' }] },
+                    { label: 'Games', children: [{ group: 'tag_group:board_games' }, { group: 'tag_group:sports' }, { group: 'tag_group:video_game' }] },
+                    {
+                        label: 'Real world',
+                        children: [
+                            { group: 'tag_group:companies_and_brand_names' },
+                            { group: 'tag_group:holidays_and_celebrations' },
+                            { group: 'tag_group:jobs' },
+                            { group: 'tag_group:locations' },
+                            { group: 'tag_group:people' },
+                            { group: 'tag_group:real_world_locations' }
+                        ]
+                    },
+                    {
+                        label: 'More',
+                        children: [
+                            { group: 'tag_group:dances' },
+                            { group: 'tag_group:family_relationships' },
+                            { group: 'tag_group:food_tags' },
+                            { group: 'tag_group:fire' },
+                            { group: 'tag_group:groups' },
+                            { group: 'tag_group:phrases' },
+                            { group: 'tag_group:subjective' },
+                            { group: 'tag_group:technology' },
+                            { group: 'tag_group:verbs_and_gerunds' },
+                            { group: 'tag_group:water' }
+                        ]
+                    }
+                ]
+            },
+            {
+                label: 'Copyrights, artists, projects and media',
+                children: [
+                    {
+                        label: 'Genres of video games',
+                        children: [
+                            { group: 'tag_group:fighting_games' },
+                            { group: 'tag_group:platform_games' },
+                            { group: 'tag_group:role-playing_games' },
+                            { group: 'tag_group:shooter_games' },
+                            { group: 'tag_group:visual_novel_games' }
+                        ]
+                    },
+                    { label: 'Artists', children: [{ group: 'tag_group:pixiv_projects' }] }
+                ]
+            },
+            { label: 'Metatags', children: [{ group: 'tag_group:metatags' }, { group: 'tag_group:drawing_software' }] }
+        ];
+
+        function getDeclaredGroupChildren() {
+            const result = new Map();
+            for (const group of getAvailableFilterGroups()) result.set(group, []);
+            for (const [child, rawParents] of Object.entries(state.captionEngine.index?.group_parents || {})) {
+                if (!result.has(child)) continue;
+                for (const parent of rawParents || []) {
+                    if (!result.has(parent) || parent === child) continue;
+                    const children = result.get(parent);
+                    if (!children.includes(child)) children.push(child);
+                }
+            }
+            for (const children of result.values()) children.sort((a, b) => formatFilterGroupName(a).localeCompare(formatFilterGroupName(b)));
+            return result;
+        }
+
+        function buildFilterGroupLayout() {
+            const available = new Set(getAvailableFilterGroups());
+            const declaredChildren = getDeclaredGroupChildren();
+            const placed = new Set();
+            let sequence = 0;
+
+            const cloneNode = (source, path = new Set()) => {
+                if (source.group && !available.has(source.group)) return null;
+                if (source.group && path.has(source.group)) return null;
+
+                const nextPath = new Set(path);
+                if (source.group) nextPath.add(source.group);
+                const node = {
+                    id: `node-${sequence++}`,
+                    label: source.group ? formatFilterGroupName(source.group) : source.label,
+                    group: source.group || null,
+                    children: []
+                };
+                if (source.group) placed.add(source.group);
+
+                const explicitGroups = new Set();
+                for (const childSource of source.children || []) {
+                    if (childSource.group) explicitGroups.add(childSource.group);
+                    const child = cloneNode(childSource, nextPath);
+                    if (child) node.children.push(child);
+                }
+
+                if (source.group) {
+                    for (const childGroup of declaredChildren.get(source.group) || []) {
+                        if (explicitGroups.has(childGroup) || nextPath.has(childGroup)) continue;
+                        const child = cloneNode({ group: childGroup }, nextPath);
+                        if (child) node.children.push(child);
+                    }
+                }
+
+                if (!node.group && node.children.length === 0) return null;
+                return node;
+            };
+
+            const roots = DANBOORU_GROUP_LAYOUT.map(source => cloneNode(source)).filter(Boolean);
+            const unplaced = Array.from(available).filter(group => !placed.has(group));
+            if (unplaced.length > 0) {
+                const unplacedSet = new Set(unplaced);
+                const parentMap = new Map(unplaced.map(group => [group, []]));
+                for (const [child, rawParents] of Object.entries(state.captionEngine.index?.group_parents || {})) {
+                    if (!unplacedSet.has(child)) continue;
+                    for (const parent of rawParents || []) {
+                        if (unplacedSet.has(parent) && parent !== child) parentMap.get(child).push(parent);
+                    }
+                }
+                const fallbackRoots = unplaced.filter(group => parentMap.get(group).length === 0).sort((a, b) => formatFilterGroupName(a).localeCompare(formatFilterGroupName(b)));
+                const extra = { id: `node-${sequence++}`, label: 'Additional index groups', group: null, children: [] };
+                for (const group of fallbackRoots) {
+                    const child = cloneNode({ group });
+                    if (child) extra.children.push(child);
+                }
+                if (extra.children.length > 0) roots.push(extra);
+            }
+            return roots;
+        }
+
+        function collectLayoutGroups(node, result = new Set()) {
+            if (node.group) result.add(node.group);
+            for (const child of node.children || []) collectLayoutGroups(child, result);
+            return result;
+        }
+
+        function expandAIGroupAncestors(groups) {
+            const selected = new Set(groups);
+            const roots = buildFilterGroupLayout();
+            const visit = node => {
+                let contains = Boolean(node.group && selected.has(node.group));
+                for (const child of node.children) contains = visit(child) || contains;
+                if (contains && node.children.length > 0) state.aiSettingsExpandedGroups.add(node.id);
+                return contains;
+            };
+            for (const root of roots) visit(root);
+        }
+
+        function setAIGroupSelection(groups) {
+            state.aiSettingsDraftGroups = new Set(groups);
+            state.aiSettingsExpandedGroups = new Set();
+            expandAIGroupAncestors(state.aiSettingsDraftGroups);
+            renderAIGroupList();
+        }
+
+        function updateAIGroupCount() {
+            const groups = getAvailableFilterGroups();
+            const available = new Set(groups);
+            const selected = Array.from(state.aiSettingsDraftGroups).filter(group => available.has(group)).length;
+            DOM.aiFilterGroupCount.textContent = `${selected} / ${groups.length} selected`;
+        }
+
+        function renderAIGroupList() {
+            const roots = buildFilterGroupLayout();
+            const query = DOM.aiFilterGroupSearch.value.trim().toLowerCase();
+            DOM.aiFilterGroupsList.innerHTML = '';
+
+            if (roots.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'text-sm text-zinc-500 p-3';
+                empty.textContent = 'No tag groups are available.';
+                DOM.aiFilterGroupsList.appendChild(empty);
+                updateAIGroupCount();
+                return;
+            }
+
+            const directMatch = node => !query || node.label.toLowerCase().includes(query) || Boolean(node.group && node.group.toLowerCase().includes(query));
+            const branchMemo = new Map();
+            const branchMatches = node => {
+                if (!query) return true;
+                if (branchMemo.has(node.id)) return branchMemo.get(node.id);
+                const matches = directMatch(node) || node.children.some(branchMatches);
+                branchMemo.set(node.id, matches);
+                return matches;
+            };
+
+            const renderNode = (node, depth, forceChildren = false) => {
+                if (!branchMatches(node)) return;
+                const subtree = collectLayoutGroups(node);
+                const selectedCount = Array.from(subtree).filter(group => state.aiSettingsDraftGroups.has(group)).length;
+                const checked = subtree.size > 0 && selectedCount === subtree.size;
+                const indeterminate = selectedCount > 0 && selectedCount < subtree.size;
+                const expanded = query ? branchMatches(node) : state.aiSettingsExpandedGroups.has(node.id);
+                const row = document.createElement('div');
+                row.className = `flex items-center min-h-9 rounded-md hover:bg-zinc-800/70 transition-colors ${node.group ? '' : 'mt-1'}`;
+                row.style.paddingLeft = `${8 + depth * 20}px`;
+
+                const disclosure = document.createElement('button');
+                disclosure.type = 'button';
+                disclosure.className = 'w-7 h-7 shrink-0 flex items-center justify-center rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-0';
+                disclosure.disabled = node.children.length === 0;
+                disclosure.innerHTML = node.children.length > 0 ? `<svg class="w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path></svg>` : '';
+                disclosure.addEventListener('click', () => {
+                    if (state.aiSettingsExpandedGroups.has(node.id)) state.aiSettingsExpandedGroups.delete(node.id);
+                    else state.aiSettingsExpandedGroups.add(node.id);
+                    renderAIGroupList();
+                });
+
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2.5 flex-1 min-w-0 py-1.5 pr-3 cursor-pointer';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'w-4 h-4 accent-zinc-200 shrink-0';
+                checkbox.checked = checked;
+                checkbox.indeterminate = indeterminate;
+                checkbox.disabled = subtree.size === 0;
+                checkbox.addEventListener('change', () => {
+                    for (const group of subtree) {
+                        if (checkbox.checked) state.aiSettingsDraftGroups.add(group);
+                        else state.aiSettingsDraftGroups.delete(group);
+                    }
+                    if (checkbox.checked && node.children.length > 0) state.aiSettingsExpandedGroups.add(node.id);
+                    renderAIGroupList();
+                });
+
+                const name = document.createElement('span');
+                name.className = node.group ? 'text-sm text-zinc-300 truncate' : 'text-sm font-semibold text-zinc-200 truncate';
+                name.textContent = node.label;
+                label.append(checkbox, name);
+
+                if (node.children.length > 0) {
+                    const count = document.createElement('span');
+                    count.className = 'ml-auto shrink-0 text-[10px] font-mono text-zinc-600';
+                    count.textContent = String(subtree.size);
+                    label.appendChild(count);
+                }
+
+                row.append(disclosure, label);
+                DOM.aiFilterGroupsList.appendChild(row);
+
+                const showChildren = forceChildren || expanded || (query && directMatch(node));
+                if (!showChildren) return;
+                for (const child of node.children) renderNode(child, depth + 1, query && directMatch(node));
+            };
+
+            let rendered = 0;
+            for (const root of roots) {
+                if (!branchMatches(root)) continue;
+                renderNode(root, 0);
+                rendered += 1;
+            }
+
+            if (rendered === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'text-sm text-zinc-500 p-3';
+                empty.textContent = 'No groups match this search.';
+                DOM.aiFilterGroupsList.appendChild(empty);
+            }
+            updateAIGroupCount();
+        }
+
+        function updateAIGroupFilterUI() {
+            const enabled = DOM.aiGroupFilterEnabled.checked;
+            DOM.aiKeepUngroupedTags.disabled = !enabled;
+            DOM.aiFilterGroupSearch.disabled = !enabled;
+            DOM.aiFilterGroupsDefaultBtn.disabled = !enabled;
+            DOM.aiFilterGroupsAllBtn.disabled = !enabled;
+            DOM.aiFilterGroupsNoneBtn.disabled = !enabled;
+            DOM.aiKeepUngroupedRow.classList.toggle('opacity-40', !enabled);
+            DOM.aiFilterGroupsPanel.classList.toggle('opacity-40', !enabled);
+            DOM.aiFilterGroupsPanel.classList.toggle('pointer-events-none', !enabled);
+        }
+
+        async function openAISettings() {
             DOM.aiGeneralThreshold.value = String(state.aiSettings.generalThreshold);
             DOM.aiCharacterThreshold.value = String(state.aiSettings.characterThreshold);
             DOM.aiGeneralThresholdValue.textContent = state.aiSettings.generalThreshold.toFixed(2);
             DOM.aiCharacterThresholdValue.textContent = state.aiSettings.characterThreshold.toFixed(2);
+            DOM.aiGroupFilterEnabled.checked = state.aiSettings.groupFilterEnabled;
+            DOM.aiKeepUngroupedTags.checked = state.aiSettings.keepUngroupedTags;
+            DOM.aiFilterGroupSearch.value = '';
+            state.aiSettingsDraftGroups = new Set(getFilterGroups());
+            state.aiSettingsExpandedGroups = new Set();
             DOM.aiTagBlacklist.value = Array.from(state.aiSettings.blacklist).map(tag => tag.replaceAll("_", " ")).join("\n");
+            switchAISettingsPage('general');
+            updateAIGroupFilterUI();
             DOM.aiSettingsModal.classList.remove('hidden');
             DOM.aiSettingsModal.classList.add('flex');
+            DOM.aiFilterGroupsList.innerHTML = '<div class="text-sm text-zinc-500 p-3">Loading tag groups…</div>';
+            DOM.aiFilterGroupCount.textContent = 'Loading…';
+
+            try {
+                await ensureCaptionIndex();
+                expandAIGroupAncestors(state.aiSettingsDraftGroups);
+                renderAIGroupList();
+            } catch (error) {
+                DOM.aiFilterGroupsList.innerHTML = '';
+                const failure = document.createElement('div');
+                failure.className = 'rounded-lg border border-red-900/60 bg-red-950/30 p-3 text-sm text-red-300 whitespace-pre-wrap break-all';
+                failure.textContent = error?.stack || error?.message || String(error);
+                DOM.aiFilterGroupsList.appendChild(failure);
+                DOM.aiFilterGroupCount.textContent = 'Load failed';
+                throw error;
+            }
         }
 
         function closeAISettings() {
@@ -646,6 +1178,9 @@
         function saveAISettings() {
             state.aiSettings.generalThreshold = Number(DOM.aiGeneralThreshold.value);
             state.aiSettings.characterThreshold = Number(DOM.aiCharacterThreshold.value);
+            state.aiSettings.groupFilterEnabled = DOM.aiGroupFilterEnabled.checked;
+            state.aiSettings.keepUngroupedTags = DOM.aiKeepUngroupedTags.checked;
+            state.aiSettings.filterGroups = new Set(state.aiSettingsDraftGroups);
             state.aiSettings.blacklist = parseBlacklist(DOM.aiTagBlacklist.value);
             closeAISettings();
         }
@@ -1227,20 +1762,23 @@
             return response.json();
         }
 
+        async function ensureCaptionIndex() {
+            if (state.captionEngine.index) return state.captionEngine.index;
+            const [baseIndex, additionalIndex] = await Promise.all([fetchJson(CAPTION_INDEX_URL), fetchJson(CAPTION_ADDITIONAL_INDEX_URL)]);
+            state.captionEngine.index = mergeIndices(baseIndex, additionalIndex);
+            return state.captionEngine.index;
+        }
+
         async function loadCaptionEngine() {
             if (state.captionEngine.loading) return state.captionEngine.loading;
 
             state.captionEngine.loading = (async () => {
                 if (!window.ort) throw new Error("onnxruntime-web failed to load.");
 
-                const [csvText, baseIndex, additionalIndex] = await Promise.all([
-                    fetchText(CAPTION_TAGS_URL),
-                    fetchJson(CAPTION_INDEX_URL),
-                    fetchJson(CAPTION_ADDITIONAL_INDEX_URL)
-                ]);
+                const [csvText, index] = await Promise.all([fetchText(CAPTION_TAGS_URL), ensureCaptionIndex()]);
 
                 state.captionEngine.labels = loadLabelsFromCsv(csvText);
-                state.captionEngine.index = mergeIndices(baseIndex, additionalIndex);
+                state.captionEngine.index = index;
 
                 ort.env.wasm.numThreads = 1;
                 ort.env.wasm.simd = true;
@@ -1351,8 +1889,11 @@
                     continue;
                 }
 
-                const memberships = index.tags?.[normalizedTag] || [];
-                if (!memberships.some(membership => KEEP_TAG_GROUPS.has(String(membership.page || "")))) continue;
+                if (state.aiSettings.groupFilterEnabled) {
+                    const memberships = index.tags?.[normalizedTag] || [];
+                    if (memberships.length === 0 && !state.aiSettings.keepUngroupedTags) continue;
+                    if (memberships.length > 0 && !memberships.some(membership => getFilterGroups().has(String(membership.page || "")))) continue;
+                }
 
                 outputTags.push(label.name.replaceAll("_", " "));
             }
